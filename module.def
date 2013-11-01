@@ -1,0 +1,8 @@
+[Module]
+Name=CraftingTool
+Version=2.0
+Files=crafting_tool.lua,skill_list.lua
+dependencies=minionlib
+enabled=1
+
+
