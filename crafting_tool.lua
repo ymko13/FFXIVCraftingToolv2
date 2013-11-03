@@ -1,6 +1,5 @@
 --What is not done:
 --1. Item Detection (for amount of NQ and HQ items)
---2. IQStacks
 --3. End craft prediction 
 --4. Cross-Class skills(require a tiny bit of code to be shown in SkillBook) + a bit into read\write (add another variable CC) :)
 
