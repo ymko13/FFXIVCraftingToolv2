@@ -1,7 +1,4 @@
 --This file contains functions which return a skill list for a certain profession
---[[
-[paypaldonation]vikzpp@gmail.com[/paypaldonation]
-]]--
 function getSkills( prof ) -- gets the skills for a certain prof
 	local func = _G["get"..prof.."Skills"]
 	if(func) then return func() end
