@@ -226,8 +226,6 @@ function CraftingTool.Skill:Use() -- Uses a skill
 		self.WaitTime = 3000
 	end
 	
-	if(self.actionType == CraftingTool.cActionType["1"] and PlayerHasBuff(CraftingTool.IQBuffID)) then CraftingTool.IQStacks = CraftingTool.IQStacks + 1 end
-	
 	ActionList:Cast(self.id,0)
 end
 --[[ End of Basic Skill Class ]]--
@@ -278,7 +276,6 @@ end
 --[[ End of Condition Class ]]--
 
 --[[ Variables ]]--
-CraftingTool.StartedCrafting = false
 CraftingTool.lastUse = 0 --Last time the skill was used + the time of the cast
 CraftingTool.currentProf = "" --String representing current prof
 CraftingTool.customDelay = 0
@@ -286,7 +283,7 @@ CraftingTool.openingSkill = false
 CraftingTool.currentSynth = {} --Updates every tick
 CraftingTool.EventsRegistered = {}
 CraftingTool.SkillBook = {}
-
+CraftingTool.lastQuality = 0
 --[[ Profile Class ]]--
 CraftingTool.Profile = {
 	Name = "",
@@ -463,40 +460,17 @@ end
 function CraftingTool.Update(Event, ticks)  -- MAIN LOOP
 	CraftingTool.currentSynth = Crafting:SynthInfo()
 	CraftingTool.customDelay = tonumber(gMWcdelay)
+	gMWcraftsleft = CraftingTool.craftsLeft
+	
 	if((ticks - CraftingTool.lastUse >= CraftingTool.customDelay) and CraftingTool.Profile.Prof ~= "" and CraftingTool.cProf[CraftingTool.Profile.Prof].id == Player.job) then
 		local keepCrafting = (CraftingTool.doNonStopCraft or CraftingTool.doLimitedCraft)
+		
 		if(gSMactive == "1" and CraftingTool.currentSynth) then -- Synth logic
-				--[[
-				itemID = synth.itemid
-				--If it's a different item then set this stuff to def and change the id of the item
-				if(CraftingTool.prevItemId ~= synth.itemid) then
-					CraftingTool.prevItemId = synth.itemid
-					CraftingTool.ProgressGain = 0
-					CraftingTool.QualityGain = 0
-					CraftingTool.FirstUse = false
-					CraftingTool.FirstUseLevel = 0
-				end
-				-- I could simply calculate this each step to make sure that it works, but it seems better to not.
-				if (CraftingTool.ProgressGain == 0 or CraftingTool.QualityGain == 0) then
-					--d("Progress Prediction: ".. tostring(ProgressPrediction(tonumber(itemLevel), tonumber(craftsmanship))))
-					--d("Quality Prediction: ".. tostring(QualityPrediction(tonumber(itemLevel), tonumber(control))))
-					CraftingTool.ProgressGain = tonumber(ProgressPrediction(tonumber(itemLevel), tonumber(craftsmanship)))
-					CraftingTool.QualityGain = tonumber(QualityPrediction(tonumber(itemLevel), tonumber(control)))
-				end				
-				local skill = SelectSkill(synth)
-				if(skill) then
-					lSkill = skill.name
-					UseSkill(skill)
-				end]]--
-				
 				gMWcrafting = "true"
 				gMWitemid = CraftingTool.currentSynth.itemid
 				
-				if(CraftingTool.StartedCrafting and CraftingTool.craftsLeft > 0) then
-					CraftingTool.craftsLeft = CraftingTool.craftsLeft - 1
-					CraftingTool.StartedCrafting = false
-				end
-				
+				if(CraftingTool.lastQuality ~= CraftingTool.currentSynth.quality and PlayerHasBuff(CraftingTool.IQBuffID)) then CraftingTool.IQStacks = CraftingTool.IQStacks + 1 end
+								
 				local skill_list = CraftingTool.Profile.Skills
 				local casted = false
 				
@@ -516,7 +490,9 @@ function CraftingTool.Update(Event, ticks)  -- MAIN LOOP
 				
 				gMWiqstacks = CraftingTool.IQStacks
 				
-				if(not casted) then
+				if(casted) then
+					CraftingTool.lastQuality = CraftingTool.currentSynth.quality 
+				else
 					d("Can't cast anything please check that your profile is set up correctly")
 				end
 		elseif(keepCrafting) then
@@ -526,6 +502,8 @@ function CraftingTool.Update(Event, ticks)  -- MAIN LOOP
 				gMWcrafting = "false"
 				gMWitemid = 0
 				gMWiqstacks = 0
+				CraftingTool.IQStacks = 0
+				CraftingTool.lastQuality = 0
 				gMWlastskill = "None"
 				--gMWnq = "0"
 				--gMWqh = "0"
@@ -533,10 +511,13 @@ function CraftingTool.Update(Event, ticks)  -- MAIN LOOP
 				Crafting:CraftSelectedItem()
 				Crafting:ToggleCraftingLog()
 				CraftingTool.lastUse = ticks + 4500
-				CraftingTool.StartedCrafting = true
 				if(CraftingTool.doLimitedCraft and CraftingTool.craftsLeft <= 1) then
 					CraftingTool.doLimitedCraft = false
-					Crafting:ToggleCraftingLog()
+					CraftingTool.craftsLeft = 0
+				elseif(CraftingTool.doNonStopCraft) then
+					gMWcraftsleft = 0
+				else
+					CraftingTool.craftsLeft = CraftingTool.craftsLeft - 1
 				end
 			end
 		end
