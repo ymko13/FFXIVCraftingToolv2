@@ -165,7 +165,7 @@ function CraftingTool.Skill:AddCondition( condition ) --adds a condition to the 
 	end
 	
 	if(self:FindCondition(condition.Type, condition.Condition)) then
-		d("Condition already exists, augmenting it's value")
+		--d("Condition already exists, augmenting it's value")
 		self:FindCondition(condition.Type, condition.Condition, condition.Value)
 	else
 		--d(("Skill ID: %7d"):format((self.id or 0)) .. " TSize: " .. #self.Condition[self.id] + 1 .. " => " .. ("New condition: ^%s %s %s^"):format(condition.Value, condition.Condition, condition.Type))
@@ -182,14 +182,14 @@ function CraftingTool.Skill:FindCondition( Type, Condition, modVal ) -- If you p
 		if(self.Condition[self.id][i].Type == Type and self.Condition[self.id][i].Condition == Condition) then
 			if(modVal ~= "") then
 				self.Condition[self.id][i].Value = modVal
-				d(self.id .. " Changing Condition => ''" .. self.Condition[self.id][i].Value .. " " .. self.Condition[self.id][i].Condition .. " " .. self.Condition[self.id][i].Type .. "''")
+				--d(self.id .. " Changing Condition => ''" .. self.Condition[self.id][i].Value .. " " .. self.Condition[self.id][i].Condition .. " " .. self.Condition[self.id][i].Type .. "''")
 			end
 			value = self.Condition[self.id][i].Value
 			result = true
 		end
 		if(result) then break end
 	end
-	if(not result) then d("Couldn't find condition: " .. Type .. " " .. Condition .. " for skill " .. self.name) end
+	--if(not result) then d("Couldn't find condition: " .. Type .. " " .. Condition .. " for skill " .. self.name) end
 	return value
 end
 
@@ -201,8 +201,8 @@ function CraftingTool.Skill:Evaluate() -- true if all pass, false if one does no
 		local condition = self.Condition[self.id][i]
 		--User Entered--
 		
-		local var = CraftingTool.currentSynth[string.lower(condition.Type)] 
-		if(var) then value = var end -- description check
+		local var = CraftingTool.currentSynth.description 
+		if(string.lower(condition.Type):match("description")) then value = var end -- description check
 		
 		if(string.lower(condition.Type) == "cp") then value = Player.cp.current end
 		if(string.lower(condition.Type) == "buffid" or string.lower(condition.Type) == "notbuffid") then value = 1 end
@@ -252,12 +252,12 @@ function CraftingTool.Condition:Evaluate(Value) -- pass in the value to test aga
 	if(self.Value == nil or tonumber(self.Value) == 0 or self.Value == "" or self.Value == " " or self.Value == "None") then return true end --If value is "empty" then return true
 	
 	if(self.Type == "buffid") then --If buff exists OR If synth condition is... i.e good, excellent
-		d("Checking: " .. self.Type .. " " .. self.Value)
+		--d("Checking: " .. self.Type .. " " .. self.Value)
 		result = PlayerHasBuff(tonumber(self.Value))
 	elseif(self.Type == "notbuffid") then --If buff doesn't exists OR If synth condition is... i.e good, excellent
-		d("Checking: " .. self.Type .. " " .. self.Value)
+		--d("Checking: " .. self.Type .. " " .. self.Value)
 		result = not PlayerHasBuff(tonumber(self.Value))
-	elseif(self.Type == "description") then
+	elseif(self.Type:match("description")) then
 		result = (self.Value == Value)
 	else
 		if(self.Condition == ">=") then
@@ -337,6 +337,7 @@ function CraftingTool.Profile:Read(filename)
 								end
 							end
 							skill = CraftingTool.Skill:New(skill, nil, skill.CC)
+							d("Skill loaded: ".. ((skill.name) and skill.name or "Couldn't read skill"))
 						end
 					elseif(skill and key=="name" or key=="on" or key=="prio") then
 						skill[key] = value
@@ -356,8 +357,12 @@ function CraftingTool.Profile:Read(filename)
 							cCond = ">="
 						elseif(string.match(key, "buff")) then
 							key = key.."id"
+						elseif(string.match(key, "condone")) then
+							key = "description1"
+						elseif(string.match(key, "condtwo")) then
+							key = "description2"
 						end
-						d(key .. " " .. cCond .. " " .. value)
+						--d(key .. " " .. cCond .. " " .. value)
 						skill:AddCondition( CraftingTool.Condition:New(key, tonumber(value), cCond) )
 					end
 				end
@@ -378,6 +383,8 @@ function CraftingTool.Profile:Read(filename)
 				self.Skills = skillList
 				self:Update()
 			end
+		else
+			d("Profile seems empty")
 		end
 	end
 	GUI_UnFoldGroup(CraftingTool.smanager.name, "Skill List")
@@ -415,7 +422,8 @@ function CraftingTool.Profile:Write(filename)
 			writeStr = writeStr.."CT_DURABILITYMIN="..skill:FindCondition( "durability", "<=").."\n"
 			writeStr = writeStr.."CT_DURABILITYMAX="..skill:FindCondition( "durability", ">=").."\n"
 			
-			writeStr = writeStr.."CT_DESCRIPTION="..skill:FindCondition( "description", "None").."\n"
+			writeStr = writeStr.."CT_CONDONE="..((skill:FindCondition( "description1", "None")) and skill:FindCondition( "description1", "None") or "None").."\n"
+			writeStr = writeStr.."CT_CONDTWO="..((skill:FindCondition( "description2", "None")) and skill:FindCondition( "description2", "None") or "None").."\n"
 			writeStr = writeStr.."CT_BUFF="..skill:FindCondition( "buffid", "None").."\n"
 			writeStr = writeStr.."CT_NOTBUFF="..skill:FindCondition( "notbuffid", "None").."\n"
 			
@@ -755,7 +763,8 @@ function SkillView()
 	GUI_NewNumeric(CraftingTool.sview.name,"QUALITY <=","gSVqualityMax", "Skill")--
 	GUI_NewNumeric(CraftingTool.sview.name,"DURABILITY >=","gSVdurabilityMin", "Skill")
 	GUI_NewNumeric(CraftingTool.sview.name,"DURABILITY <=","gSVdurabilityMax", "Skill")--
-	GUI_NewComboBox(CraftingTool.sview.name, "DESCRIPTION =","gSVdescription", "Skill", " ,Poor, Normal, Good, Excellent")
+	GUI_NewComboBox(CraftingTool.sview.name, "CONDITION =","gSVcondition1", "Skill", " ,Poor, Normal, Good, Excellent")
+	GUI_NewComboBox(CraftingTool.sview.name, "OR =","gSVcondition2", "Skill", " ,Poor, Normal, Good, Excellent")
 	
 	GUI_NewNumeric(CraftingTool.sview.name,"Buff =","gSVbuffid", "Skill")
 	GUI_NewNumeric(CraftingTool.sview.name,"Buff not =","gSVnotbuffid", "Skill")
@@ -822,14 +831,14 @@ end
 function CraftingTool.AddSkillToProfile( sname )
 	local skill = CraftingTool.SkillBook[sname]
 	skill.prio = TableSize(CraftingTool.Profile.Skills) + 1
-	d(sname)
+	d("Adding skill: "..sname)
 	if(skill["CC"]) then d(skill.name) end
 	if (skill ~= nil) then
 		if(CraftingTool.Profile.Name and CraftingTool.Profile.Name ~= "" and CraftingTool.Profile.Name ~= "None") then
 			skill["on"] = "1"
 			value = 0
-			for e,i in pairs({ "iqstacks", "cp", "step", "progress", "quality", "durability", "description", "buffid", "notbuffid" }) do
-				if(i == "description") then
+			for e,i in pairs({ "iqstacks", "cp", "step", "progress", "quality", "durability", "description1", "description2", "buffid", "notbuffid" }) do
+				if(i:match("description")) then
 					if(skill:FindCondition(i, "None") == nil) then skill:AddCondition(CraftingTool.Condition:New(i, " ")) end
 				elseif(i == "buffid" or i == "notbuffid") then
 					if(skill:FindCondition(i, "None") == nil) then skill:AddCondition(CraftingTool.Condition:New(i, value)) end
@@ -843,6 +852,8 @@ function CraftingTool.AddSkillToProfile( sname )
 			CraftingTool.Profile.Skills:Add(skill)
 			CraftingTool.AddSkillManagerEntry(skill)
 		end
+	else
+		d("Skill seems to be empty or loaded incorrectly")
 	end
 end
 
@@ -906,29 +917,10 @@ function CraftingTool.UpdateView ( skill, opening )
 		local qualityMax	= skill:FindCondition( "quality", ">=" ) or 0
 		local durabilityMin = skill:FindCondition( "durability", "<=" ) or 0
 		local durabilityMax = skill:FindCondition( "durability", ">=" ) or 0
-		local description	= skill:FindCondition( "description", "None" ) or "None"
+		local description1	= skill:FindCondition( "description1", "None" ) or "None"
+		local description2	= skill:FindCondition( "description2", "None" ) or "None"
 		local buffid		= skill:FindCondition( "buffid", "None" ) or 0
 		local notbuffid		= skill:FindCondition( "notbuffid", "None" ) or 0
-		
-		--[[d("----------")
-		d(id)
-		d(name)
-		d(prio)
-		d(iqstacks)
-		d(cpMin)
-		d(cpMax)
-		d(stepMin)
-		d(stepMax)
-		d(progressMin)
-		d(progressMax)
-		d(qualityMin)
-		d(qualityMax)
-		d(durabilityMin)
-		d(durabilityMax)
-		d(description)
-		d(buffid)
-		d(notbuffid)
-		d("----------")]]--
 		
 		gSVid 			 = id
 		gSVname 		 = name
@@ -945,7 +937,8 @@ function CraftingTool.UpdateView ( skill, opening )
 		gSVqualityMax	 = qualityMax
 		gSVdurabilityMin = durabilityMin
 		gSVdurabilityMax = durabilityMax
-		gSVdescription	 = description
+		gSVcondition1	 = description1
+		gSVcondition2	 = description2
 		gSVbuffid		 = buffid
 		gSVnotbuffid	 = notbuffid
 		
