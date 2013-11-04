@@ -1,7 +1,6 @@
 --What is not done:
 --1. Item Detection (for amount of NQ and HQ items)
---3. End craft prediction 
---4. Cross-Class skills(require a tiny bit of code to be shown in SkillBook) + a bit into read\write (add another variable CC) :)
+--2. End craft prediction 
 
 --Notes:
 --For conditions, in SkillView it shows >= but the equivalent code wise in condition is <=
@@ -11,15 +10,15 @@ CraftingTool={ }
 
 CraftingTool.profilepath = GetStartupPath() .. [[\LuaMods\CraftingTool\Profiles\]];
 --[[ Window Settings ]]--
-CraftingTool.mainwindow = { name = "CraftingTool", x = 500, y = 200, w = 250, h = 350 }
-CraftingTool.smanager = { name = "CraftingTool_SkillManager", x = CraftingTool.mainwindow.x + CraftingTool.mainwindow.w, y = 200, w = 250, h = 350 }
-CraftingTool.sbook = { name = "CraftingTool_SkillBook", x = CraftingTool.smanager.x + CraftingTool.smanager.w, y = 200, w = 250, h = 350 }
-CraftingTool.sview = { name = "CraftingTool_SkillView", x = CraftingTool.sbook.x + CraftingTool.sbook.w, y = 200, w = 250, h = 500 }
+CraftingTool.mainwindow = { name = "CraftingTool", x = 500, y = 200, w = 220, h = 300 }
+CraftingTool.smanager = { name = "CraftingTool_SkillManager", x = CraftingTool.mainwindow.x + CraftingTool.mainwindow.w, y = 200, w = 220, h = 300 }
+CraftingTool.sbook = { name = "CraftingTool_SkillBook", x = CraftingTool.smanager.x + CraftingTool.smanager.w, y = 200, w = 250, h = 500 }
+CraftingTool.sview = { name = "CraftingTool_SkillView", x = 0, y = 0, w = 250, h = 500 }
 
 --[[ Crafting States ]]--
 CraftingTool.doNonStopCraft = false --Used for non-stop craft
 CraftingTool.doLimitedCraft = false --Used for a limited craft
-CraftingTool.craftsLeft = 0
+CraftingTool.craftsLeft = 0 --Shows how many crafts left to do with limited craft
 
 --[[ User Variables for Craft Prediction ]]--
 CraftingTool.ProgressGain = 0
@@ -234,7 +233,7 @@ end
 --[[ Condition Class ]]--
 --Whatever you enter into new is basically: Value Cond Player.Value
 --Example:
---New("cp", 100, ">=") would be checking if player cp is >= than 100
+--New("cp", 100, "<=") would be checking if player cp is >= than 100 or if 100 <= than player cp
 CraftingTool.Condition = {} -- cp, step, progress, quality, durability, description, buff 
 function CraftingTool.Condition:New(Type, Value, Cond) -- you pass Type(i.e cp), Value(i.e 10), Cond(i.e '>=' or '=<' or '!=' or '==' also 'None'). If Type is Buff or Description then there is no need for Condition. It will just check
 	Type = Type or "None"
@@ -289,14 +288,28 @@ CraftingTool.Profile = {
 	Skills = CraftingTool.SkillList:New()
 }
 
+function CraftingTool.Profile:Update()
+	GUI_DeleteGroup(CraftingTool.smanager.name, "Skill List")
+	table.sort(self.Skills, function(a,b) return a.prio < b.prio end )	
+	local y = 1
+	for i = 1,#self.Skills do					
+		if (self.Skills[i] ~= nil ) then
+			--d(Skills[i].id .. " " .. Skills[i].name)
+			CraftingTool.AddSkillManagerEntry(self.Skills[i], y)
+			y = y + 1
+		end
+	end
+	GUI_UnFoldGroup(CraftingTool.smanager.name, "Skill List")
+end
+
 --Pulse from game loop
 function CraftingTool.Update(Event, ticks)  -- MAIN LOOP
 	CraftingTool.currentSynth = Crafting:SynthInfo()
 	CraftingTool.customDelay = tonumber(gMWcdelay)
 	
-	if(ticks - CraftingTool.lastUse >= CraftingTool.customDelay and CraftingTool.Profile.Prof ~= "" and CraftingTool.cProf[CraftingTool.Profile.Prof].id == Player.job) then
+	if( CraftingTool.Profile.Prof ~= "" and CraftingTool.cProf[CraftingTool.Profile.Prof].id == Player.job and (ticks - CraftingTool.lastUse >= CraftingTool.customDelay) ) then
 		local keepCrafting = (CraftingTool.doNonStopCraft or CraftingTool.doLimitedCraft)
-		if(CraftingTool.currentSynth and gSMactive == "1") then -- Synth logic
+		if(gSMactive == "1" and CraftingTool.currentSynth) then -- Synth logic
 				--[[
 				itemID = synth.itemid
 				--If it's a different item then set this stuff to def and change the id of the item
@@ -377,7 +390,7 @@ end
 --[[ GUI Update ]]--
 function CraftingTool.GUIVARUpdate(Event, NewVals, OldVals)
 	for k,v in pairs(NewVals) do
-		if(k == "gSBprof") then 
+		if(k == "gSBprof" or k == "gSBshowCC") then 
 			updateSkillBook()
 		elseif(k == "gSMselectedProfile") then
 			CraftingTool.Profile.Name = "None"
@@ -403,7 +416,11 @@ function CraftingTool.ModuleInit()
 	_G[getProf(13)] = CraftingTool.SkillList:New(getSkills(getProf(13)))
 	_G[getProf(14)] = CraftingTool.SkillList:New(getSkills(getProf(14)))
 	_G[getProf(15)] = CraftingTool.SkillList:New(getSkills(getProf(15)))
-	_G["CrossClass"] = CraftingTool.SkillList:New(getSkills("CrossClass"))
+	local cclist = getSkills("CrossClass")
+	_G["CrossClass"] = {}
+	for pr, list in pairs(cclist) do
+		_G["CrossClass"][pr] = CraftingTool.SkillList:New(list)
+	end
 	
 	--Init windows
 	GUI_NewWindow(CraftingTool.mainwindow.name, CraftingTool.mainwindow.x, CraftingTool.mainwindow.y, CraftingTool.mainwindow.w, CraftingTool.mainwindow.h)
@@ -458,10 +475,13 @@ function MainWindow()
 	--
 	
 	--Settings gMWcdelay
+	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Skill Manager", "gSMactive", "Settings")
+	GUI_NewNumeric(CraftingTool.mainwindow.name, "Custom Delay", "gMWcdelay", "Settings")
+	
+	--[[GUI_NewField(CraftingTool.mainwindow.name, "", "gMWEmpty", "Settings")
 	GUI_NewNumeric(CraftingTool.mainwindow.name, "Craftsmanship", "gMWCraftsmanship", "Settings")	
 	GUI_NewNumeric(CraftingTool.mainwindow.name, "Control", "gMWControl", "Settings")
 	GUI_NewNumeric(CraftingTool.mainwindow.name, "Recipe Level", "gMWRecipeLevel", "Settings")
-	GUI_NewNumeric(CraftingTool.mainwindow.name, "Custom Delay", "gMWcdelay", "Settings")
 	
 	if (Settings.CraftingTool.gMWCraftsmanship == nil) then
 		Settings.CraftingTool.gMWCraftsmanship = "1"
@@ -480,10 +500,10 @@ function MainWindow()
 	end
 	gMWcdelay = Settings.CraftingTool.gMWcdelay
 	
-	--GUI_NewCheckbox(CraftingTool.mainwindow.name, "Use Quality", "gMWQuality", "Settings")
-	--GUI_NewCheckbox(CraftingTool.mainwindow.name, "Use Durability", "gMWDurability", "Settings")
-	--GUI_NewCheckbox(CraftingTool.mainwindow.name, "Use Buff", "gMWBuff", "Settings")
-	--GUI_NewCheckbox(CraftingTool.mainwindow.name, "Use Skip", "gMWSkip", "Settings")
+	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Use Quality", "gMWQuality", "Settings")
+	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Use Durability", "gMWDurability", "Settings")
+	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Use Buff", "gMWBuff", "Settings")
+	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Use Skip", "gMWSkip", "Settings")
 	
 	if (Settings.CraftingTool.gMWQuality == nil) then
 		Settings.CraftingTool.gMWQuality = "0"
@@ -501,6 +521,7 @@ function MainWindow()
 		Settings.CraftingTool.gMWSkip = "0"
 	end
 	gMWSkip = Settings.CraftingTool.gMWSkip
+	]]--
 	
 	GUI_UnFoldGroup(CraftingTool.mainwindow.name,"Settings")
 	--
@@ -531,6 +552,7 @@ function SkillBook()
 	gSBprof = "Weaver"
 	
 	GUI_NewCheckbox(CraftingTool.sbook.name, "Show Cross Class", "gSBshowCC", "Settings")
+	gSBshowCC = "1"
 	
 	GUI_UnFoldGroup(CraftingTool.sbook.name,"Settings")
 	
@@ -540,7 +562,6 @@ end
 --Initialises SkillMngr Window
 function SkillMngr()
 	--Skill manager settings
-	GUI_NewCheckbox(CraftingTool.smanager.name, "Active", "gSMactive", "Settings")
 	GUI_NewComboBox(CraftingTool.smanager.name, "Profile","gSMselectedProfile", "Settings", " ")
 	
 	updateProfiles()
@@ -581,20 +602,20 @@ function SkillView()
 	local s = "------------------------------------------------------------------------------------------------------"
 	GUI_NewField(CraftingTool.sview.name, s, "emptyS", "Skill")
 	emptyS = s
-	GUI_NewNumeric(CraftingTool.sview.name,"cp >=","gSVcpMin", "Skill")
-	GUI_NewNumeric(CraftingTool.sview.name,"cp <=","gSVcpMax", "Skill")--
-	GUI_NewNumeric(CraftingTool.sview.name,"step >=","gSVstepMin", "Skill")
-	GUI_NewNumeric(CraftingTool.sview.name,"step <=","gSVstepMax", "Skill")--
-	GUI_NewNumeric(CraftingTool.sview.name,"progress >=","gSVprogressMin", "Skill")
-	GUI_NewNumeric(CraftingTool.sview.name,"progress <=","gSVprogressMax", "Skill")--
-	GUI_NewNumeric(CraftingTool.sview.name,"quality >=","gSVqualityMin", "Skill")
-	GUI_NewNumeric(CraftingTool.sview.name,"quality <=","gSVqualityMax", "Skill")--
-	GUI_NewNumeric(CraftingTool.sview.name,"durability >=","gSVdurabilityMin", "Skill")
-	GUI_NewNumeric(CraftingTool.sview.name,"durability <=","gSVdurabilityMax", "Skill")--
-	GUI_NewComboBox(CraftingTool.sview.name, "description","gSVdescription", "Skill", " ,Poor, Normal, Good, Excellent")
+	GUI_NewNumeric(CraftingTool.sview.name,"CP >=","gSVcpMin", "Skill")
+	GUI_NewNumeric(CraftingTool.sview.name,"CP <=","gSVcpMax", "Skill")--
+	GUI_NewNumeric(CraftingTool.sview.name,"STEP >=","gSVstepMin", "Skill")
+	GUI_NewNumeric(CraftingTool.sview.name,"STEP <=","gSVstepMax", "Skill")--
+	GUI_NewNumeric(CraftingTool.sview.name,"PROGRESS >=","gSVprogressMin", "Skill")
+	GUI_NewNumeric(CraftingTool.sview.name,"PROGRESS <=","gSVprogressMax", "Skill")--
+	GUI_NewNumeric(CraftingTool.sview.name,"QUALITY >=","gSVqualityMin", "Skill")
+	GUI_NewNumeric(CraftingTool.sview.name,"QUALITY <=","gSVqualityMax", "Skill")--
+	GUI_NewNumeric(CraftingTool.sview.name,"DURABILITY >=","gSVdurabilityMin", "Skill")
+	GUI_NewNumeric(CraftingTool.sview.name,"DURABILITY <=","gSVdurabilityMax", "Skill")--
+	GUI_NewComboBox(CraftingTool.sview.name, "DESCRIPTION =","gSVdescription", "Skill", " ,Poor, Normal, Good, Excellent")
 	
-	GUI_NewNumeric(CraftingTool.sview.name,"Buff Present","gSVbuffid", "Skill")
-	GUI_NewNumeric(CraftingTool.sview.name,"Buff Not Present","gSVnotbuffid", "Skill")
+	GUI_NewNumeric(CraftingTool.sview.name,"Buff =","gSVbuffid", "Skill")
+	GUI_NewNumeric(CraftingTool.sview.name,"Buff not =","gSVnotbuffid", "Skill")
 	
 	GUI_UnFoldGroup(CraftingTool.sview.name,"Skill") -- Skill
 	
@@ -610,23 +631,41 @@ end
 function updateSkillBook()
 	CraftingTool.Profile.Prof = gSBprof
 	local Skills = _G[gSBprof]
-
+	local CrossClass = _G["CrossClass"]
+	
 	for i,e in pairs(CraftingTool.cActionType) do
 		GUI_DeleteGroup(CraftingTool.sbook.name,e.." List")
 	end
+	GUI_DeleteGroup(CraftingTool.sbook.name, "Cross Class")
 	
 	if(Skills) then
 		for i=1,#Skills do
 			local skill = CraftingTool.Skill:New(Skills[i], nil, false) -- skill table, condition table, whether CC or not
 			addSkillBookEntry(skill)
 		end
-	end	
+	end
+	
+	if(CrossClass and gSBshowCC == "1") then
+		for prof,skilllist in pairs(CrossClass) do
+			if(prof ~= gSBprof and skilllist) then
+				local sprof = "gMW"..prof
+				GUI_NewField(CraftingTool.sbook.name, prof, sprof, "Cross Class")
+				_G[sprof] = "Skills"
+				for i=1,#skilllist do
+					local skill = CraftingTool.Skill:New(skilllist[i], nil, true)
+					skill["CC"] = true
+					addSkillBookEntry(skill, "Cross Class")
+				end
+			end
+		end
+	end
 end
-function addSkillBookEntry ( skill )
+function addSkillBookEntry ( skill, groupName )
 	if (skill) then
 		local sname = skill.name
+		groupName = groupName or skill.actionType.." List"
 		
-		GUI_NewButton(CraftingTool.sbook.name, sname, sname, skill.actionType.." List")
+		GUI_NewButton(CraftingTool.sbook.name, sname, sname, groupName)
 		
 		if ( CraftingTool.EventsRegistered[sname] == nil ) then
 			RegisterEventHandler( sname, CraftingTool.AddSkillToProfile)
@@ -636,9 +675,12 @@ function addSkillBookEntry ( skill )
 		CraftingTool.SkillBook[sname] = skill
 	end
 end
+
 function CraftingTool.AddSkillToProfile( sname )
 	local skill = CraftingTool.SkillBook[sname]
 	skill.prio = TableSize(CraftingTool.Profile.Skills) + 1
+	d(sname)
+	if(skill["CC"]) then d(skill.name) end
 	if (skill ~= nil) then
 		if(CraftingTool.Profile.Name and CraftingTool.Profile.Name ~= "" and CraftingTool.Profile.Name ~= "None") then
 			skill["on"] = "1"
@@ -662,17 +704,18 @@ function CraftingTool.AddSkillToProfile( sname )
 end
 
 --[[ Skill Manager Functions ]]--
-function CraftingTool.AddSkillManagerEntry(skill)
+function CraftingTool.AddSkillManagerEntry(skill, y)
 	if (skill) then
 		local sname = skill.name
+		local bname = "["..tostring(y or skill.prio).."] "..skill.name .. " [" .. ((skill.on == "1") and "+" or "-") .. "]"
 		
 		local i = 0
-		while(( CraftingTool.EventsRegistered[sname.."["..i.."]"] ~= nil )) do
+		--[[while(( CraftingTool.EventsRegistered[sname.."["..i.."]"] ~= nil )) do
 			i = i + 1
-		end
+		end]]--
 		sname = sname .. "["..i.."]"
 		
-		GUI_NewButton(CraftingTool.smanager.name, sname, sname, "Skill List")
+		GUI_NewButton(CraftingTool.smanager.name, bname, sname, "Skill List")
 		RegisterEventHandler( sname, CraftingTool.SkillView)
 		CraftingTool.EventsRegistered[sname] = 1
 	end
@@ -683,12 +726,10 @@ function newProfile()
 		gSMselectedProfile = gSMnewProfileName
 		CraftingTool.Profile.Name = gSMselectedProfile
 		CraftingTool.Profile.Prof = gSBprof
-		writeProfile()
-		readProfile()
+		CraftingTool.Profile:Update()
 	end
 end
 function readProfile()
-	GUI_DeleteGroup(CraftingTool.smanager.name, "Skill List")
 	Settings.CraftingTool.gSMselectedProfile = gSMselectedProfile
 	d("Opening Profile: "..gSMselectedProfile)
 	if ( gSMselectedProfile and gSMselectedProfile ~= "") then
@@ -703,24 +744,33 @@ function readProfile()
 				local _, key, value = string.match(line, "(%w+)_(%w+)=(.*)")
 				key = key:lower()
 				if(key and value and key ~= "" and value ~= "") then
-					--d(_.." "..key.." "..value)
 					if(key == "prof" and value and value ~= "") then
 						prof = value 
 					elseif(key == "id") then
 						if(_G[prof]) then
 							skill = _G[prof]:getSkillById(tonumber(value))
-							if(skill == nil or skill.name == nil) then
-								if(_G["CrossClass"]) then skill = _G["CrossClass"]:getSkillById(tonumber(value)) end
+							if(skill == nil or skill.name == nil) then --If I can't find a skill in a normal prof table, look into the CC table
+								if(_G["CrossClass"]) then
+									for sprof, slist in pairs(_G["CrossClass"]) do
+										if(sprof ~= prof) then
+											skill = slist:getSkillById(tonumber(value))
+											if(skill and skill.id) then
+												skill["CC"] = true
+												break
+											end
+										end
+									end
+								end
 							end
+							skill = CraftingTool.Skill:New(skill, nil, skill.CC)
 						end
-					elseif(key=="name" or key=="on" or key=="prio") then
+					elseif(skill and key=="name" or key=="on" or key=="prio") then
 						skill[key] = value
-					elseif(key == "end") then
-						--d(skill.id .. " " .. skill.name)
+					elseif(skill and key == "end") then
 						unsortedList:Add(skill)
 						skill = {}
 						skillname = ""
-					else
+					elseif(skill) then
 						local cType = key
 						local cCond = "None"
 						if(string.match(key, "min")) then
@@ -731,8 +781,8 @@ function readProfile()
 							cCond = ">="
 						elseif(string.match(key, "iqstacks")) then
 							cCond = ">="
+							d(cType .. " " .. value)
 						end
-						--d(cType .. " " .. value .. " " .. cCond)
 						skill:AddCondition(CraftingTool.Condition:New(cType, tonumber(value), cCond))
 					end
 				end
@@ -751,13 +801,7 @@ function readProfile()
 				table.sort(skillList, function(a,b) return a.prio < b.prio end )	
 				
 				CraftingTool.Profile.Skills = skillList
-				
-				for i = 1,#skillList do					
-					if (skillList[i] ~= nil ) then
-						--d(skillList[i].id .. " " .. skillList[i].name)
-						CraftingTool.AddSkillManagerEntry(skillList[i])
-					end
-				end
+				CraftingTool.Profile:Update()
 			end
 		end
 	end
@@ -768,7 +812,7 @@ function writeProfile()
 	local filename = gSMselectedProfile
 	local filepath = "" --CraftingTool.profilepath..filename..".lua"
 	
-	if ((gSMselectedProfile ~= nil and gSMselectedProfile ~= "None" and gSMselectedProfile ~= "")) then
+	if ((filename ~= nil and filename ~= "None" and filename ~= "" and filename ~= " ")) then
 		filepath = CraftingTool.profilepath..filename..".lua"
 	end
 	
@@ -802,6 +846,8 @@ function writeProfile()
 			writeStr = writeStr.."CT_END=0\n"
 		end
 		d(filewrite(filepath,writeStr))
+	else
+		d("Incorrect profile name: " .. filename)
 	end
 end
 function updateProfiles()
@@ -832,11 +878,12 @@ function updateSkillFromView( varname, value ) -- Updates the skill inside the P
 			ctype = (string.match(key, 'min') and "<=" or ">=")
 			key = key:gsub('min', ''):gsub('max', '')
 		end
-		
+		if(key == "iqstacks") then ctype = ">=" end
 		--d("Skill Name: ".. CraftingTool.Profile.Skills[id].name.." => "..key .. " => " .. value .. " " .. ctype .. " Player Value")
-		
+				
 		if(key == "id" or key=="name" or key=="on" or key=="prio") then
 			CraftingTool.Profile.Skills[id][key] = value
+			CraftingTool.Profile:Update()
 		else
 			CraftingTool.Profile.Skills[id]:FindCondition(key, ctype, tonumber(value))
 		end
@@ -844,7 +891,6 @@ function updateSkillFromView( varname, value ) -- Updates the skill inside the P
 end
 function CraftingTool.UpdateView ( skill )
 	if (skill and skill ~= {} and skill.id and skill.name) then
-		
 		local id 			= skill.id
 		local name 			= skill.name
 		local on 			= skill.on or 1
@@ -903,6 +949,8 @@ function CraftingTool.UpdateView ( skill )
 		gSVbuffid		 = buffid
 		gSVnotbuffid	 = notbuffid
 		
+		local window = GUI_GetWindowInfo(CraftingTool.smanager.name)	
+		GUI_MoveWindow(CraftingTool.sview.name, window.x+window.width,window.y) 
 		GUI_WindowVisible(CraftingTool.sview.name,true)
 	end
 end
@@ -925,13 +973,16 @@ function CraftingTool.Craft( dir )
 end
 
 function CraftingTool.SkillMngr( dir )
+	local window = GUI_GetWindowInfo(CraftingTool.mainwindow.name)	
+	GUI_MoveWindow(CraftingTool.smanager.name, window.x+window.width,window.y) 
 	GUI_WindowVisible(CraftingTool.smanager.name,true)
 end
 
 function CraftingTool.SkillView( sname )
 	sname = sname:gsub("%[(%d+)%]", "")
 	local skill = CraftingTool.Profile.Skills:getSkillByName(sname)
-	d("Skill Level: " .. skill:FindCondition("level","<="))
+	local level = skill:FindCondition("level","<=") or "CC"
+	d("Skill Level: " .. level)
 	CraftingTool.UpdateView(skill)
 end
 
@@ -939,6 +990,8 @@ function CraftingTool.SkillManagerHandler( dir )
 	if(dir == "Create New") then
 		newProfile()
 	elseif(dir == "Skill Book") then
+		local window = GUI_GetWindowInfo(CraftingTool.smanager.name)	
+		GUI_MoveWindow(CraftingTool.sbook.name, window.x+window.width,window.y)
 		GUI_WindowVisible(CraftingTool.sbook.name,true)
 	elseif(dir == "Save Profile") then
 		writeProfile()
@@ -950,8 +1003,7 @@ function CraftingTool.SkillViewHandler( dir )
 		if ( TableSize(CraftingTool.Profile.Skills) > 0 ) then
 			GUI_DeleteGroup(CraftingTool.smanager.name,"Skill List")
 			CraftingTool.Profile.Skills:Remove(CraftingTool.Profile.Skills:getSkillById(tonumber(gSVid)))
-			writeProfile()
-			readProfile()
+			CraftingTool.Profile:Update()
 		end
 	end
 end
