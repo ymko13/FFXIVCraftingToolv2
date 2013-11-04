@@ -998,7 +998,6 @@ function CraftingTool.SkillView( sname )
 	sname = sname:gsub("%[(%d+)%]", "")
 	local skill = CraftingTool.Profile.Skills:getSkillByName(sname)
 	local level = skill:FindCondition("level","<=") or "CC"
-	--d("Skill Level: " .. level)
 	CraftingTool.UpdateView(skill, opening)
 end
 
