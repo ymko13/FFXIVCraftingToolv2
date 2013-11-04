@@ -7,7 +7,7 @@ Credits:
 ==========
 ymko
 
-dannuic - Helped a lot with the module
+dannuic
 Special thanks:
 ==========
 CUL,CRP,LTW - Skill list done by aakk47
