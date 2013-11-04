@@ -385,7 +385,7 @@ function CraftingTool.Profile:Read(filename)
 							conditionlist = conditionlist..", "..key..((key:match("description") or key:match("buff")) and "" or "(").." '"..cCond.."'"
 							lastkey = key
 						end
-						skill:AddCondition( CraftingTool.Condition:New(key, tonumber(value), cCond) )
+						skill:AddCondition( CraftingTool.Condition:New(key, (key:match("description") and tostring(value) or tonumber(value)), cCond) )
 					end
 				end
 			end	
@@ -760,8 +760,8 @@ function SkillView()
 	GUI_NewNumeric(CraftingTool.sview.name,"DURABILITY >=","gSVdurabilityMin", "Skill")
 	GUI_NewNumeric(CraftingTool.sview.name,"DURABILITY <=","gSVdurabilityMax", "Skill")--
 	GUI_NewField(CraftingTool.sview.name, s, "emptyS", "Skill")
-	GUI_NewComboBox(CraftingTool.sview.name, "CONDITION =","gSVcondition1", "Skill", "None, Poor, Normal, Good, Excellent")
-	GUI_NewComboBox(CraftingTool.sview.name, "OR =","gSVcondition2", "Skill", "None, Poor, Normal, Good, Excellent")
+	GUI_NewComboBox(CraftingTool.sview.name, "CONDITION =","gSVcondition1", "Skill", "None,Poor,Normal,Good,Excellent")
+	GUI_NewComboBox(CraftingTool.sview.name, "OR","gSVcondition2", "Skill", "None,Poor,Normal,Good,Excellent")
 	GUI_NewField(CraftingTool.sview.name, s, "emptyS", "Skill")
 	emptyS = s
 	GUI_NewNumeric(CraftingTool.sview.name,"Buff =","gSVbuffid", "Skill")
