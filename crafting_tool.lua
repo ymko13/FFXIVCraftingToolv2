@@ -283,9 +283,9 @@ function CraftingTool.Condition:Evaluate(Value) -- pass in the value to test aga
 		end
 	end
 	--[[if(result) then
-		d("Result is true for: " .. self.Type .. " as " .. self.Value .. self.Condition .. Value)
+		d("Result is true for: " .. self.Type .. " as " .. self.Value .. " " .. self.Condition .. " " .. Value)
 	else
-		d("Result is false for: " .. self.Type .. " as " .. self.Value .. self.Condition .. Value)
+		d("Result is false for: " .. self.Type .. " as " .. self.Value .. " " .. self.Condition .. " " .. Value)
 	end]]--
 	return result
 end
@@ -1024,11 +1024,10 @@ function PlayerHasBuff(id) -- Returns a buffid of the buff needing to be recast
 	local hasBuff = false
 	if (Player) then
 		local pbuffs = Player.buffs
-		if ( pbuffs  and TableSize(pbuffs) > 0) then
-			for i=0,TableSize(pbuffs) do
-				local buff = pbuffs[i]
-				if ( buff ) then
-					if(buff.id == id) then 
+		if (pbuffs) then
+			for i,buff in pairs(pbuffs) do
+				if (buff) then
+					if (buff.id == id) then
 						hasBuff = true
 						break
 					end
