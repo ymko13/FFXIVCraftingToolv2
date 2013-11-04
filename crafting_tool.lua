@@ -182,19 +182,22 @@ function CraftingTool.Skill:FindCondition( Type, Condition, modVal ) -- If you p
 		if(self.Condition[self.id][i].Type == Type and self.Condition[self.id][i].Condition == Condition) then
 			if(modVal ~= "") then
 				self.Condition[self.id][i].Value = modVal
-				d(self.id .. " Changing Condition => ''" .. self.Condition[self.id][i].Value .. " " .. self.Condition[self.id][i].Condition .. " " .. self.Condition[self.id][i].Type .. "''")
+				--d(self.id .. " Changing Condition => ''" .. self.Condition[self.id][i].Value .. " " .. self.Condition[self.id][i].Condition .. " " .. self.Condition[self.id][i].Type .. "''")
 			end
 			value = self.Condition[self.id][i].Value
 			result = true
 		end
 		if(result) then break end
 	end
-	if(not result) then d("Couldn't find condition: " .. Type .. " " .. Condition .. " for skill " .. self.name) end
+	--if(not result) then d("Couldn't find condition: " .. Type .. " " .. Condition .. " for skill " .. self.name) end
 	return value
 end
 
 function CraftingTool.Skill:Evaluate() -- true if all pass, false if one does not pass (Every condition added that is not in the standard roster needs to have a value leached from somewhere, check in this function)
 	local result = true
+	
+	local dcheck = false
+	local descriptionone = false
 	
 	for i=1,#self.Condition[self.id] do
 		local value = 0
@@ -202,17 +205,24 @@ function CraftingTool.Skill:Evaluate() -- true if all pass, false if one does no
 		--User Entered--
 		
 		local var = CraftingTool.currentSynth.description 
-		if(string.lower(condition.Type):match("description")) then value = var end -- description check
-		
-		if(string.lower(condition.Type) == "cp") then value = Player.cp.current end
-		if(string.lower(condition.Type) == "buffid" or string.lower(condition.Type) == "notbuffid") then value = 1 end
-		if(string.lower(condition.Type) == "iqstacks") then value = CraftingTool.IQStacks end
-		--Default Checks--
-		if(string.lower(condition.Type) == "level") then value = Player.level end
-		if(string.lower(condition.Type) == "enoughcp") then value = Player.cp.current end
-		
-		result = condition:Evaluate(value) -- you pass in the value
-		
+		if(string.lower(condition.Type):match("description")) then -- description check
+			if(dcheck) then
+				result = descriptionone or condition:Evaluate(value)
+			else
+				descriptionone = condition:Evaluate(value)
+				result = true
+				dcheck = true
+			end
+		else
+			if(string.lower(condition.Type) == "cp") then value = Player.cp.current end
+			if(string.lower(condition.Type) == "buffid" or string.lower(condition.Type) == "notbuffid") then value = 1 end
+			if(string.lower(condition.Type) == "iqstacks") then value = CraftingTool.IQStacks end
+			--Default Checks--
+			if(string.lower(condition.Type) == "level") then value = Player.level end
+			if(string.lower(condition.Type) == "enoughcp") then value = Player.cp.current end
+			
+			result = condition:Evaluate(value) -- you pass in the value
+		end
 		if(not result) then break end
 	end
 	
@@ -541,8 +551,6 @@ function CraftingTool.Update(Event, ticks)  -- MAIN LOOP
 					CraftingTool.craftsLeft = CraftingTool.craftsLeft - 1
 				end
 			end
-		elseif(not keepCrafting and Crafting:IsCraftingLogOpen()) then
-			Crafting:ToggleCraftingLog()
 		end
 	end
 end
