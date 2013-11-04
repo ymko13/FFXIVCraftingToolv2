@@ -132,8 +132,17 @@ function CraftingTool.Skill:New( skilldetails, conditionlist, CC ) -- Creates a 
 	
 	self.__index = self
 	
-	if(self.id) then
-		skilldetails["Condition"][self.id] = conditionlist
+	local sname = skilldetails.name
+	local i = 0
+	while(( skilldetails.Condition[sname..i] ~= nil )) do
+		i = i + 1
+	end
+	sname = sname..i
+	skilldetails["CLid"] = sname
+	d(skilldetails.CLid)
+	
+	if(skilldetails.CLid) then
+		skilldetails["Condition"][skilldetails.CLid] = conditionlist
 	end
 	
 	skilldetails:AddDefConditions(CC)
@@ -142,7 +151,7 @@ function CraftingTool.Skill:New( skilldetails, conditionlist, CC ) -- Creates a 
 end
 
 function CraftingTool.Skill:Destructor()
-	self.Condition[self.id] = {}
+	self.Condition[self.CLid] = {}
 end
 
 function CraftingTool.Skill:AddDefConditions(CC) -- Adds default conditions
@@ -160,16 +169,16 @@ function CraftingTool.Skill:Get( varname ) -- e.g somevar:Get("id") will return 
 end
 
 function CraftingTool.Skill:AddCondition( condition ) --adds a condition to the condition list
-	if(self.Condition[self.id] == nil) then
-		self.Condition[self.id] = {}
+	if(self.Condition[self.CLid] == nil) then
+		self.Condition[self.CLid] = {}
 	end
 	
 	if(self:FindCondition(condition.Type, condition.Condition)) then
 		--d("Condition already exists, augmenting it's value")
 		self:FindCondition(condition.Type, condition.Condition, condition.Value)
 	else
-		--d(("Skill ID: %7d"):format((self.id or 0)) .. " TSize: " .. #self.Condition[self.id] + 1 .. " => " .. ("New condition: ^%s %s %s^"):format(condition.Value, condition.Condition, condition.Type))
-		table.insert(self.Condition[self.id], #self.Condition[self.id] + 1, condition)
+		--d(("Skill ID: %7d"):format((self.id or 0)) .. " TSize: " .. #self.Condition[self.CLid] + 1 .. " => " .. ("New condition: ^%s %s %s^"):format(condition.Value, condition.Condition, condition.Type))
+		table.insert(self.Condition[self.CLid], #self.Condition[self.CLid] + 1, condition)
 	end
 end
 
@@ -178,13 +187,13 @@ function CraftingTool.Skill:FindCondition( Type, Condition, modVal ) -- If you p
 	local result = false
 	modVal = modVal or ""
 	
-	for i=1,#self.Condition[self.id] do
-		if(self.Condition[self.id][i].Type == Type and self.Condition[self.id][i].Condition == Condition) then
+	for i=1,#self.Condition[self.CLid] do
+		if(self.Condition[self.CLid][i].Type == Type and self.Condition[self.CLid][i].Condition == Condition) then
 			if(modVal ~= "") then
-				self.Condition[self.id][i].Value = modVal
-				--d(self.id .. " Changing Condition => ''" .. self.Condition[self.id][i].Value .. " " .. self.Condition[self.id][i].Condition .. " " .. self.Condition[self.id][i].Type .. "''")
+				self.Condition[self.CLid][i].Value = modVal
+				--d(self.id .. " Changing Condition => ''" .. self.Condition[self.CLid][i].Value .. " " .. self.Condition[self.CLid][i].Condition .. " " .. self.Condition[self.CLid][i].Type .. "''")
 			end
-			value = self.Condition[self.id][i].Value
+			value = self.Condition[self.CLid][i].Value
 			result = true
 		end
 		if(result) then break end
@@ -198,9 +207,9 @@ function CraftingTool.Skill:Evaluate() -- true if all pass, false if one does no
 	
 	local condition1 = nil
 	
-	for i=1,#self.Condition[self.id] do
+	for i=1,#self.Condition[self.CLid] do
 		local value = 0
-		local condition = self.Condition[self.id][i]
+		local condition = self.Condition[self.CLid][i]
 		
 		
 		value = CraftingTool.currentSynth[string.lower(condition.Type)]
