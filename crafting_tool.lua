@@ -196,14 +196,17 @@ end
 function CraftingTool.Skill:Evaluate() -- true if all pass, false if one does not pass (Every condition added that is not in the standard roster needs to have a value leached from somewhere, check in this function)
 	local result = true
 	
-	local hasone = false
 	local condition1 = nil
 	
 	for i=1,#self.Condition[self.id] do
 		local value = 0
 		local condition = self.Condition[self.id][i]
 		
-		--User Entered--
+		
+		value = CraftingTool.currentSynth[string.lower(condition.Type)]
+		
+		if(string.lower(condition.Type):match("description")) then value = CraftingTool.currentSynth.description end -- description check
+		    
 		if(string.lower(condition.Type) == "cp") then value = Player.cp.current end
 		if(string.lower(condition.Type) == "buffid" or string.lower(condition.Type) == "notbuffid") then value = 1 end
 		if(string.lower(condition.Type) == "iqstacks") then value = CraftingTool.IQStacks end
@@ -211,18 +214,8 @@ function CraftingTool.Skill:Evaluate() -- true if all pass, false if one does no
 		if(string.lower(condition.Type) == "level") then value = Player.level end
 		if(string.lower(condition.Type) == "enoughcp") then value = Player.cp.current end
 		
-		result = condition:Evaluate(value) -- you pass in the value
+		result = condition:Evaluate(value) -- you pass in the value    
 		
-		value = CraftingTool.currentSynth.description 
-		if(string.lower(condition.Type):match("description")) then
-			if(not hasone) then
-				result = not hasone
-				hasone = not hasone
-				condition1 = condition
-			else
-				result = condition:Evaluate(value) or condition1:Evaluate(value)
-			end
-		end
 		if(not result) then break end
 	end
 	
@@ -280,7 +273,11 @@ function CraftingTool.Condition:Evaluate(Value) -- pass in the value to test aga
 			result = ( tonumber(self.Value) == tonumber(Value) )
 		end
 	end
-	if(not result) then d("Result is false for: " .. self.Type .. " as " .. self.Value .. self.Condition .. Value) end
+	--[[if(result) then
+		d("Result is true for: " .. self.Type .. " as " .. self.Value .. self.Condition .. Value)
+	else
+		d("Result is false for: " .. self.Type .. " as " .. self.Value .. self.Condition .. Value)
+	end]]--
 	return result
 end
 --[[ End of Condition Class ]]--
@@ -507,8 +504,8 @@ function CraftingTool.Update(Event, ticks)  -- MAIN LOOP
 				
 				for i=1,TableSize(skill_list) do --Loop through all the skills and select a skill which has the lowest(best) priorty and meets all the criteria
 					local skill = skill_list[i]
+					--d("Skill: " .. skill.name)
 					local use = skill:Evaluate()
-					--d("Spell id: " .. skill.id .. " Can Cast:" .. tostring(use))
 					if(use and tonumber(skill.on) == 1) then
 						casted = true
 						skill:Use()
