@@ -1,7 +1,4 @@
 --This file contains functions which return a skill list for a certain profession
---[[
-[paypaldonation]vikzpp@gmail.com[/paypaldonation]
-]]--
 function getSkills( prof ) -- gets the skills for a certain prof
 	if(prof == "Carpenter") then return getCarpenterSkills() end
 	if(prof == "Weaver") then return getWeaverSkills() end
