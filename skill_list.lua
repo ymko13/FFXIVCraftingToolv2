@@ -3,15 +3,8 @@
 [paypaldonation]vikzpp@gmail.com[/paypaldonation]
 ]]--
 function getSkills( prof ) -- gets the skills for a certain prof
-	if(prof == "Carpenter") then return getCarpenterSkills() end
-	if(prof == "Weaver") then return getWeaverSkills() end
-	if(prof == "Blacksmith") then return getBlacksmithSkills() end
-	if(prof == "Armourer") then return getArmourerSkills() end
-	if(prof == "Goldsmith") then return getGoldsmithSkills() end
-	if(prof == "Leatherworker") then return getLeatherworkerSkills() end
-	if(prof == "Alchemist") then return getAlchemistSkills() end
-	if(prof == "Culinary") then return getCulinarySkills() end
-	if(prof == "CrossClass") then return getCrossClassSkills() end
+	local func = _G["get"..prof.."Skills"]
+	if(func) then return func() end
 	return {}
 end
 

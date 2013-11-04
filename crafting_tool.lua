@@ -306,8 +306,7 @@ end
 function CraftingTool.Update(Event, ticks)  -- MAIN LOOP
 	CraftingTool.currentSynth = Crafting:SynthInfo()
 	CraftingTool.customDelay = tonumber(gMWcdelay)
-	
-	if( CraftingTool.Profile.Prof ~= "" and CraftingTool.cProf[CraftingTool.Profile.Prof].id == Player.job and (ticks - CraftingTool.lastUse >= CraftingTool.customDelay) ) then
+	if((ticks - CraftingTool.lastUse >= CraftingTool.customDelay) and CraftingTool.Profile.Prof ~= "" and CraftingTool.cProf[CraftingTool.Profile.Prof].id == Player.job) then
 		local keepCrafting = (CraftingTool.doNonStopCraft or CraftingTool.doLimitedCraft)
 		if(gSMactive == "1" and CraftingTool.currentSynth) then -- Synth logic
 				--[[
@@ -477,6 +476,16 @@ function MainWindow()
 	--Settings gMWcdelay
 	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Skill Manager", "gSMactive", "Settings")
 	GUI_NewNumeric(CraftingTool.mainwindow.name, "Custom Delay", "gMWcdelay", "Settings")
+		
+	if (Settings.CraftingTool.gSMactive == nil) then
+		Settings.CraftingTool.gSMactive = "1"
+	end
+	gSMactive = Settings.CraftingTool.gSMactive
+	
+	if (Settings.CraftingTool.gMWcdelay == nil) then
+		Settings.CraftingTool.gMWcdelay = "500"
+	end
+	gMWcdelay = Settings.CraftingTool.gMWcdelay
 	
 	--[[GUI_NewField(CraftingTool.mainwindow.name, "", "gMWEmpty", "Settings")
 	GUI_NewNumeric(CraftingTool.mainwindow.name, "Craftsmanship", "gMWCraftsmanship", "Settings")	
@@ -495,10 +504,7 @@ function MainWindow()
 		Settings.CraftingTool.gMWRecipeLevel = "1"
 	end
 	gMWRecipeLevel = Settings.CraftingTool.gMWRecipeLevel
-	if (Settings.CraftingTool.gMWcdelay == nil) then
-		Settings.CraftingTool.gMWcdelay = "500"
-	end
-	gMWcdelay = Settings.CraftingTool.gMWcdelay
+
 	
 	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Use Quality", "gMWQuality", "Settings")
 	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Use Durability", "gMWDurability", "Settings")
@@ -565,11 +571,7 @@ function SkillMngr()
 	GUI_NewComboBox(CraftingTool.smanager.name, "Profile","gSMselectedProfile", "Settings", " ")
 	
 	updateProfiles()
-	
-	if (Settings.CraftingTool.gSMactive == nil) then
-		Settings.CraftingTool.gSMactive = "1"
-	end
-	gSMactive = Settings.CraftingTool.gSMactive
+
 	if (Settings.CraftingTool.gSMselectedProfile == nil) then
 		Settings.CraftingTool.gSMselectedProfile = " "
 	end
@@ -781,8 +783,8 @@ function readProfile()
 							cCond = ">="
 						elseif(string.match(key, "iqstacks")) then
 							cCond = ">="
-							d(cType .. " " .. value)
 						end
+						--d(cType .. " " .. cCond .. " " .. value)
 						skill:AddCondition(CraftingTool.Condition:New(cType, tonumber(value), cCond))
 					end
 				end
