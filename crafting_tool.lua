@@ -284,6 +284,7 @@ CraftingTool.currentSynth = {} --Updates every tick
 CraftingTool.EventsRegistered = {}
 CraftingTool.SkillBook = {}
 CraftingTool.lastQuality = 0
+
 --[[ Profile Class ]]--
 CraftingTool.Profile = {
 	Name = "",
@@ -520,6 +521,8 @@ function CraftingTool.Update(Event, ticks)  -- MAIN LOOP
 					CraftingTool.craftsLeft = CraftingTool.craftsLeft - 1
 				end
 			end
+		elseif(not keepCrafting and Crafting:IsCraftingLogOpen()) then
+			Crafting:ToggleCraftingLog()
 		end
 	end
 end
