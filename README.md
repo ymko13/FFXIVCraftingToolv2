@@ -6,6 +6,8 @@ This one includes a skill manager.
 Credits:
 ==========
 ymko
+
+dannuic - Helped a lot with the module
 Special thanks:
 ==========
 CUL,CRP,LTW - Skill list done by aakk47
