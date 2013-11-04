@@ -5,7 +5,8 @@ Version 2 of the Crafting Tool for the mmominion.com FFXIV bot.
 This one includes a skill manager.
 Credits:
 ==========
-ymko\n
+ymko
+
 dannuic - Helped a lot with the module
 Special thanks:
 ==========
