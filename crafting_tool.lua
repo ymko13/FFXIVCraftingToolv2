@@ -182,14 +182,14 @@ function CraftingTool.Skill:FindCondition( Type, Condition, modVal ) -- If you p
 		if(self.Condition[self.id][i].Type == Type and self.Condition[self.id][i].Condition == Condition) then
 			if(modVal ~= "") then
 				self.Condition[self.id][i].Value = modVal
-				--d(self.id .. " Changing Condition => ''" .. self.Condition[self.id][i].Value .. " " .. self.Condition[self.id][i].Condition .. " " .. self.Condition[self.id][i].Type .. "''")
+				d(self.id .. " Changing Condition => ''" .. self.Condition[self.id][i].Value .. " " .. self.Condition[self.id][i].Condition .. " " .. self.Condition[self.id][i].Type .. "''")
 			end
 			value = self.Condition[self.id][i].Value
 			result = true
 		end
 		if(result) then break end
 	end
-	--if(not result) then d("Couldn't find condition: " .. Type .. " " .. Condition .. " for skill " .. self.name) end
+	if(not result) then d("Couldn't find condition: " .. Type .. " " .. Condition .. " for skill " .. self.name) end
 	return value
 end
 
@@ -313,8 +313,10 @@ function CraftingTool.Profile:Read(filename)
 			local unsortedList = CraftingTool.SkillList:New()
 			local skillList = CraftingTool.SkillList:New()
 			local skill = {}
-			
+			local conditionlist = ""
+			local lastkey = ""
 			for i,line in pairs(profile) do
+				--d(line)
 				local _, key, value = string.match(line, "(%w+)_(%w+)=(.*)")
 				key = key:lower()
 				if(key and value and key ~= "" and value ~= "") then
@@ -337,14 +339,16 @@ function CraftingTool.Profile:Read(filename)
 								end
 							end
 							skill = CraftingTool.Skill:New(skill, nil, skill.CC)
-							d("Skill loaded: ".. ((skill.name) and skill.name or "Couldn't read skill"))
 						end
 					elseif(skill and key=="name" or key=="on" or key=="prio") then
 						skill[key] = value
 					elseif(skill and key == "end") then
 						unsortedList:Add(skill)
+						d("Skill loaded: ".. ((skill.name) and skill.name or "Couldn't read skill"))
+						d("Conditions: "..conditionlist)
 						skill = {}
 						skillname = ""
+						conditionlist = ""
 					elseif(skill) then
 						local cCond = "None"
 						if(string.match(key, "min")) then
@@ -362,7 +366,15 @@ function CraftingTool.Profile:Read(filename)
 						elseif(string.match(key, "condtwo")) then
 							key = "description2"
 						end
-						--d(key .. " " .. cCond .. " " .. value)
+						--d(key .. " " .. value)
+						if(conditionlist == "") then
+							conditionlist = key.." '"..cCond.."'"
+						elseif(key == lastkey) then
+							conditionlist = conditionlist.." '"..cCond.."' )"
+						else
+							conditionlist = conditionlist..", "..key..((key:match("description") or key:match("buff")) and "" or "(").." '"..cCond.."'"
+							lastkey = key
+						end
 						skill:AddCondition( CraftingTool.Condition:New(key, tonumber(value), cCond) )
 					end
 				end
@@ -653,29 +665,6 @@ function MainWindow()
 		Settings.CraftingTool.gMWRecipeLevel = "1"
 	end
 	gMWRecipeLevel = Settings.CraftingTool.gMWRecipeLevel
-
-	
-	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Use Quality", "gMWQuality", "Settings")
-	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Use Durability", "gMWDurability", "Settings")
-	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Use Buff", "gMWBuff", "Settings")
-	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Use Skip", "gMWSkip", "Settings")
-	
-	if (Settings.CraftingTool.gMWQuality == nil) then
-		Settings.CraftingTool.gMWQuality = "0"
-	end
-	gMWQuality = Settings.CraftingTool.gMWQuality
-	if (Settings.CraftingTool.gMWDurability == nil) then
-		Settings.CraftingTool.gMWDurability = "0"
-	end
-	gMWDurability = Settings.CraftingTool.gMWDurability
-	if (Settings.CraftingTool.gMWBuff == nil) then
-		Settings.CraftingTool.gMWBuff = "0"
-	end
-	gMWBuff = Settings.CraftingTool.gMWBuff
-	if (Settings.CraftingTool.gMWSkip == nil) then
-		Settings.CraftingTool.gMWSkip = "0"
-	end
-	gMWSkip = Settings.CraftingTool.gMWSkip
 	]]--
 	
 	GUI_UnFoldGroup(CraftingTool.mainwindow.name,"Settings")
@@ -752,7 +741,6 @@ function SkillView()
 	GUI_NewNumeric(CraftingTool.sview.name,"IQStacks >=","gSViqstacks", "Skill")
 	local s = "------------------------------------------------------------------------------------------------------"
 	GUI_NewField(CraftingTool.sview.name, s, "emptyS", "Skill")
-	emptyS = s
 	GUI_NewNumeric(CraftingTool.sview.name,"CP >=","gSVcpMin", "Skill")
 	GUI_NewNumeric(CraftingTool.sview.name,"CP <=","gSVcpMax", "Skill")--
 	GUI_NewNumeric(CraftingTool.sview.name,"STEP >=","gSVstepMin", "Skill")
@@ -763,9 +751,11 @@ function SkillView()
 	GUI_NewNumeric(CraftingTool.sview.name,"QUALITY <=","gSVqualityMax", "Skill")--
 	GUI_NewNumeric(CraftingTool.sview.name,"DURABILITY >=","gSVdurabilityMin", "Skill")
 	GUI_NewNumeric(CraftingTool.sview.name,"DURABILITY <=","gSVdurabilityMax", "Skill")--
-	GUI_NewComboBox(CraftingTool.sview.name, "CONDITION =","gSVcondition1", "Skill", " ,Poor, Normal, Good, Excellent")
-	GUI_NewComboBox(CraftingTool.sview.name, "OR =","gSVcondition2", "Skill", " ,Poor, Normal, Good, Excellent")
-	
+	GUI_NewField(CraftingTool.sview.name, s, "emptyS", "Skill")
+	GUI_NewComboBox(CraftingTool.sview.name, "CONDITION =","gSVcondition1", "Skill", "None, Poor, Normal, Good, Excellent")
+	GUI_NewComboBox(CraftingTool.sview.name, "OR =","gSVcondition2", "Skill", "None, Poor, Normal, Good, Excellent")
+	GUI_NewField(CraftingTool.sview.name, s, "emptyS", "Skill")
+	emptyS = s
 	GUI_NewNumeric(CraftingTool.sview.name,"Buff =","gSVbuffid", "Skill")
 	GUI_NewNumeric(CraftingTool.sview.name,"Buff not =","gSVnotbuffid", "Skill")
 	
@@ -881,7 +871,7 @@ function updateSkillFromView( varname, value ) -- Updates the skill inside the P
 	local id = CraftingTool.Profile.Skills:getListPos(CraftingTool.Profile.Skills:getSkillById(tonumber(gSVid)))
 	if(id ~= 0) then
 		local key = string.match(varname, "gSV(%w+)")
-		key = key:lower()
+		key = key:lower():gsub("condition", "description")
 		local ctype = "None"
 			
 		if(string.match(key, 'min') or string.match(key, 'max')) then
@@ -889,11 +879,12 @@ function updateSkillFromView( varname, value ) -- Updates the skill inside the P
 			key = key:gsub('min', ''):gsub('max', '')
 		end
 		if(key == "iqstacks") then ctype = ">=" end
-		--d("Skill Name: ".. CraftingTool.Profile.Skills[id].name.." => "..key .. " => " .. value .. " " .. ctype .. " Player Value")
 				
 		if(key == "id" or key=="name" or key=="on" or key=="prio") then
 			CraftingTool.Profile.Skills[id][key] = value
 			if(not CraftingTool.openingSkill) then CraftingTool.Profile:Update() end
+		elseif(key:match("description")) then
+			CraftingTool.Profile.Skills[id]:FindCondition(key, ctype, tostring(value))
 		else
 			CraftingTool.Profile.Skills[id]:FindCondition(key, ctype, tonumber(value))
 		end
