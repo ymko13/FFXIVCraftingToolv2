@@ -340,8 +340,6 @@ function CraftingTool.Profile:Read(filename)
 		local profile = fileread(CraftingTool.profilepath..filename..".lua")
 		if ( TableSize(profile) > 0) then
 			local prof = ""
-			local unsortedList = CraftingTool.SkillList:New()
-			local skillList = CraftingTool.SkillList:New()
 			local skill = {}
 			local conditionlist = ""
 			local lastkey = ""
@@ -357,11 +355,11 @@ function CraftingTool.Profile:Read(filename)
 						if(skilldetails) then
 							skill = CraftingTool.Skill:New(skilldetails)
 						end
-						--d(skill)
+						d(skill)
 					elseif(skill and key=="name" or key=="on" or key=="prio") then
 						skill[key] = value
 					elseif(skill and key == "end") then
-						unsortedList:Add(skill)
+						self.Skills:Add(skill)
 						d("Skill loaded: ".. ((skill.name) and skill.name or "Couldn't read skill"))
 						--d("Conditions: "..conditionlist)
 						skill = {}
@@ -402,15 +400,8 @@ function CraftingTool.Profile:Read(filename)
 			self.Prof = prof
 			
 			--GUI call and sort
-			if ( TableSize(unsortedList) > 0 ) then
-				local i,skill = next (unsortedList)
-				while i and skill do
-					skillList:Add( skill )
-					i,skill = next (unsortedList,i)
-				end
-				table.sort(skillList, function(a,b) return a.prio < b.prio end )	
-				
-				self.Skills = skillList
+			if ( TableSize(self.Skills) > 0 ) then
+				table.sort(self.Skills, function(a,b) return a.prio < b.prio end )	
 				self:Update()
 			end
 			d("Crafting Tool Profile Successfully Opened")
@@ -435,6 +426,7 @@ function CraftingTool.Profile:Write(filename)
 		d("Full path: "..filepath)
 		local writeStr = "CT_Prof="..gSBprof.."\n"
 		for i, skill in pairs(self.Skills) do
+			d(skill)
 			writeStr = writeStr.."CT_ID="..skill.id.."\n"
 			writeStr = writeStr.."CT_NAME="..skill.name.."\n"
 			
@@ -460,7 +452,7 @@ function CraftingTool.Profile:Write(filename)
 			
 			writeStr = writeStr.."CT_END=0\n"
 		end
-		d(filewrite(filepath,writeStr))
+		d(tostring(filewrite(filepath,writeStr)))
 	else
 		d("Incorrect profile name: " .. filename)
 	end
