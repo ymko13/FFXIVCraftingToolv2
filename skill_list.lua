@@ -1,4 +1,42 @@
 --This file contains functions which return a skill list for a certain profession
+
+function getSkillDetails( prof, var, value )
+	local ccskills = getSkills( "CrossClass" )
+	local skilldetails = nil
+	
+	skilldetails = GetFromList(getSkills( prof ), var, value)
+	
+	if(skilldetails == nil) then
+		for sProf, skills in pairs(ccskills) do
+			if(sProf ~= prof) then
+				skilldetails = GetFromList(skills, var, value)
+				if(skilldetails ~= nil) then
+					skilldetails["CC"] = true
+					break
+				end
+			end
+		end
+	else
+		skilldetails["CC"] = false
+	end
+	
+	return skilldetails
+end
+
+function GetFromList( list, var, value ) -- Only works for lists(that is all variables are from 1 to tablesize that contain tables
+	local retVal = nil
+	if(list) then
+		for i=1, #list do
+			local check = list[i]
+			if(check[var] == value) then
+				retVal = check
+				break
+			end
+		end
+	end
+	return retVal
+end
+
 function getSkills( prof ) -- gets the skills for a certain prof
 	local func = _G["get"..prof.."Skills"]
 	if(func) then return func() end

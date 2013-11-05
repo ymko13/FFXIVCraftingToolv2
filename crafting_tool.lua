@@ -12,7 +12,7 @@ CraftingTool.profilepath = GetStartupPath() .. [[\LuaMods\CraftingTool\Profiles\
 --[[ Window Settings ]]--
 CraftingTool.mainwindow = { name = "CraftingTool", x = 500, y = 200, w = 220, h = 300 }
 CraftingTool.smanager = { name = "CraftingTool_SkillManager", x = CraftingTool.mainwindow.x + CraftingTool.mainwindow.w, y = 200, w = 220, h = 300 }
-CraftingTool.sbook = { name = "CraftingTool_SkillBook", x = CraftingTool.smanager.x + CraftingTool.smanager.w, y = 200, w = 250, h = 500 }
+CraftingTool.sbook = { name = "CraftingTool_SkillBook", x = CraftingTool.smanager.x + CraftingTool.smanager.w, y = 200, w = 300, h = 500 }
 CraftingTool.sview = { name = "CraftingTool_SkillView", x = 0, y = 0, w = 250, h = 500 }
 
 --[[ Crafting States ]]--
@@ -88,11 +88,11 @@ function CraftingTool.SkillList:getListPos ( value ) -- works only for skills
 	return id
 end
 
-function CraftingTool.SkillList:getSkillById( skillID )
+function CraftingTool.SkillList:getSkillByUID( skillUID )
 	local skill = nil
 	
 	for i,e in pairs(self) do
-		if(e.id == tonumber(skillID)) then
+		if(e.uid == tonumber(skillUID)) then
 			skill = e
 			break
 		end
@@ -117,41 +117,55 @@ end
 
 --[[ Basic Skill Class ]]--
 CraftingTool.Skill = { -- Can have many params like  ["id"] = 0, ["name"] = "", ["level"] = "", ["cost"] = "", ["actionType"] = "", ["buffid"] = "", ["length"] = "", ["efficiency"] = "", ["chance"] = ""
-	WaitTime=3000,
+	WaitTime=0,
 	Condition = {},
 	on = 0
 }
 
-function CraftingTool.Skill:New( skilldetails, conditionlist, CC ) -- Creates a new variable of class CraftingTool.Skill requires skill details leached from Prof.lua files and a boolean stating whether its cross class or not(default false)
-	CC = CC or false
-		
-	conditionlist = ((type(conditionlist) == 'table') and conditionlist or {})
+function CraftingTool.Skill:New( skilldetails ) -- Creates a new variable of class CraftingTool.Skill requires skill details leached from Prof.lua files and a boolean stating whether its cross class or not(default false)
+	skilldetails = skilldetails or {}
+	local conditionlist = {}
+	local CC = skilldetails.CC or false
+	--d("Creating a new skill")
+	
+	local uid = tostring(skilldetails.id)
+	
+	local newuid = uid
+	local y = 0
+	while not CraftingTool.Profile:IsUniqueSkill(newuid) do
+		newuid = uid..tostring(y)
+		d(tostring(newuid))
+		y = y + 1
+	end
+	uid = tonumber(newuid)
+	
+	skilldetails["uid"] = uid
+	
+	local newskill = deepcopy(CraftingTool.Skill)
+	
+	for i,e in pairs (skilldetails) do
+		newskill[i] = e
+	end
+	
+	return newskill
+end
 
-	skilldetails = skilldetails or { }
-	setmetatable(skilldetails, self)
-	
-	self.__index = self
-	
-	local sname = skilldetails.name
-	local i = 0
-	while(( skilldetails.Condition[sname..i] ~= nil )) do
-		i = i + 1
-	end
-	sname = sname..i
-	skilldetails["CLid"] = sname
-	d(skilldetails.CLid)
-	
-	if(skilldetails.CLid) then
-		skilldetails["Condition"][skilldetails.CLid] = conditionlist
-	end
-	
-	skilldetails:AddDefConditions(CC)
-	
-	return skilldetails
+function deepcopy(t)
+	if type(t) ~= 'table' then return t end
+	local mt = getmetatable(t)
+	local res = {}
+		for k,v in pairs(t) do
+			if type(v) == 'table' then
+				v = deepcopy(v)
+			end
+			res[k] = v
+		end
+	setmetatable(res,mt)
+	return res
 end
 
 function CraftingTool.Skill:Destructor()
-	self.Condition[self.CLid] = {}
+	self.Condition = {}
 end
 
 function CraftingTool.Skill:AddDefConditions(CC) -- Adds default conditions
@@ -165,20 +179,20 @@ function CraftingTool.Skill:AddDefConditions(CC) -- Adds default conditions
 end
  
 function CraftingTool.Skill:Get( varname ) -- e.g somevar:Get("id") will return the id of this skill
-	return self[string.lower(varname)]
+	return self[varname]
 end
 
 function CraftingTool.Skill:AddCondition( condition ) --adds a condition to the condition list
-	if(self.Condition[self.CLid] == nil) then
-		self.Condition[self.CLid] = {}
+	if(self.Condition == nil) then
+		self.Condition = {}
 	end
 	
 	if(self:FindCondition(condition.Type, condition.Condition)) then
 		--d("Condition already exists, augmenting it's value")
 		self:FindCondition(condition.Type, condition.Condition, condition.Value)
 	else
-		--d(("Skill ID: %7d"):format((self.id or 0)) .. " TSize: " .. #self.Condition[self.CLid] + 1 .. " => " .. ("New condition: ^%s %s %s^"):format(condition.Value, condition.Condition, condition.Type))
-		table.insert(self.Condition[self.CLid], #self.Condition[self.CLid] + 1, condition)
+		--d(("Skill ID: %7d"):format((self.id or 0)) .. " TSize: " .. #self.Condition + 1 .. " => " .. ("New condition: ^%s %s %s^"):format(condition.Value, condition.Condition, condition.Type))
+		table.insert(self.Condition, #self.Condition + 1, condition)
 	end
 end
 
@@ -187,13 +201,13 @@ function CraftingTool.Skill:FindCondition( Type, Condition, modVal ) -- If you p
 	local result = false
 	modVal = modVal or ""
 	
-	for i=1,#self.Condition[self.CLid] do
-		if(self.Condition[self.CLid][i].Type == Type and self.Condition[self.CLid][i].Condition == Condition) then
+	for i=1,#self.Condition do
+		if(self.Condition[i].Type == Type and self.Condition[i].Condition == Condition) then
 			if(modVal ~= "") then
-				self.Condition[self.CLid][i].Value = modVal
-				--d(self.id .. " Changing Condition => ''" .. self.Condition[self.CLid][i].Value .. " " .. self.Condition[self.CLid][i].Condition .. " " .. self.Condition[self.CLid][i].Type .. "''")
+				self.Condition[i].Value = modVal
+				--d(self.id .. " Changing Condition => ''" .. self.Condition[i].Value .. " " .. self.Condition[i].Condition .. " " .. self.Condition[i].Type .. "''")
 			end
-			value = self.Condition[self.CLid][i].Value
+			value = self.Condition[i].Value
 			result = true
 		end
 		if(result) then break end
@@ -207,9 +221,9 @@ function CraftingTool.Skill:Evaluate() -- true if all pass, false if one does no
 	
 	local condition1 = nil
 	
-	for i=1,#self.Condition[self.CLid] do
+	for i=1,#self.Condition do
 		local value = 0
-		local condition = self.Condition[self.CLid][i]
+		local condition = self.Condition[i]
 		
 		
 		value = CraftingTool.currentSynth[string.lower(condition.Type)]
@@ -300,7 +314,7 @@ CraftingTool.currentSynth = {} --Updates every tick
 CraftingTool.EventsRegistered = {}
 CraftingTool.SkillBook = {}
 CraftingTool.lastQuality = 0
-
+CraftingTool.CurrentlyOpenUID = 0
 --[[ Profile Class ]]--
 CraftingTool.Profile = {
 	Name = "",
@@ -321,7 +335,7 @@ end
 
 function CraftingTool.Profile:Read(filename)
 	filename = filename or ""
-	d("Opening Profile: "..filename)
+	d("Opening Crafting Tool Profile: "..filename)
 	if ( filename and filename ~= "") then
 		local profile = fileread(CraftingTool.profilepath..filename..".lua")
 		if ( TableSize(profile) > 0) then
@@ -336,32 +350,20 @@ function CraftingTool.Profile:Read(filename)
 				local _, key, value = string.match(line, "(%w+)_(%w+)=(.*)")
 				key = key:lower()
 				if(key and value and key ~= "" and value ~= "") then
-					if(key == "prof" and value and value ~= "") then
+					if(key == "prof") then
 						prof = value 
 					elseif(key == "id") then
-						if(_G[prof]) then
-							skill = _G[prof]:getSkillById(tonumber(value))
-							if(skill == nil or skill.name == nil) then --If I can't find a skill in a normal prof table, look into the CC table
-								if(_G["CrossClass"]) then
-									for sprof, slist in pairs(_G["CrossClass"]) do
-										if(sprof ~= prof) then
-											skill = slist:getSkillById(tonumber(value))
-											if(skill and skill.id) then
-												skill["CC"] = true
-												break
-											end
-										end
-									end
-								end
-							end
-							skill = CraftingTool.Skill:New(skill, nil, skill.CC)
+						local skilldetails = getSkillDetails(prof, key, tonumber(value))
+						if(skilldetails) then
+							skill = CraftingTool.Skill:New(skilldetails)
 						end
+						--d(skill)
 					elseif(skill and key=="name" or key=="on" or key=="prio") then
 						skill[key] = value
 					elseif(skill and key == "end") then
 						unsortedList:Add(skill)
 						d("Skill loaded: ".. ((skill.name) and skill.name or "Couldn't read skill"))
-						d("Conditions: "..conditionlist)
+						--d("Conditions: "..conditionlist)
 						skill = {}
 						skillname = ""
 						conditionlist = ""
@@ -411,8 +413,9 @@ function CraftingTool.Profile:Read(filename)
 				self.Skills = skillList
 				self:Update()
 			end
+			d("Crafting Tool Profile Successfully Opened")
 		else
-			d("Profile seems empty")
+			d("Profile seems broken or empty")
 		end
 	end
 	GUI_UnFoldGroup(CraftingTool.smanager.name, "Skill List")
@@ -475,6 +478,20 @@ function CraftingTool.Profile:Update()
 		end
 	end
 	GUI_UnFoldGroup(CraftingTool.smanager.name, "Skill List")
+end
+
+function CraftingTool.Profile:IsUniqueSkill( uid ) -- return whether the skill with this uid is going to be unique within the profile (boolean)
+	local unique = true
+	
+	for i,e in pairs(self.Skills) do
+		if(e.uid == tonumber(uid)) then
+			unique = false
+			d(e.uid)
+			break
+		end
+	end
+	
+	return unique
 end
 
 function CraftingTool.Profile:UpdateProfileList()
@@ -579,21 +596,6 @@ end
 
 --[[ Module and Window Init ]]--
 function CraftingTool.ModuleInit()
-	--Init Global Variables for every profession
-	_G[getProf(8)] = CraftingTool.SkillList:New(getSkills(getProf(8)))
-	_G[getProf(9)] = CraftingTool.SkillList:New(getSkills(getProf(9)))
-	_G[getProf(10)] = CraftingTool.SkillList:New(getSkills(getProf(10)))
-	_G[getProf(11)] = CraftingTool.SkillList:New(getSkills(getProf(11)))
-	_G[getProf(12)] = CraftingTool.SkillList:New(getSkills(getProf(12)))
-	_G[getProf(13)] = CraftingTool.SkillList:New(getSkills(getProf(13)))
-	_G[getProf(14)] = CraftingTool.SkillList:New(getSkills(getProf(14)))
-	_G[getProf(15)] = CraftingTool.SkillList:New(getSkills(getProf(15)))
-	local cclist = getSkills("CrossClass")
-	_G["CrossClass"] = {}
-	for pr, list in pairs(cclist) do
-		_G["CrossClass"][pr] = CraftingTool.SkillList:New(list)
-	end
-	
 	--Init windows
 	GUI_NewWindow(CraftingTool.mainwindow.name, CraftingTool.mainwindow.x, CraftingTool.mainwindow.y, CraftingTool.mainwindow.w, CraftingTool.mainwindow.h)
 	MainWindow()
@@ -786,8 +788,8 @@ end
 --[[ Skill Book Functions ]]--
 function updateSkillBook()
 	CraftingTool.Profile.Prof = gSBprof
-	local Skills = _G[gSBprof]
-	local CrossClass = _G["CrossClass"]
+	local Skills = getSkills(gSBprof)
+	local CrossClass = getSkills("CrossClass")
 	
 	for i,e in pairs(CraftingTool.cActionType) do
 		GUI_DeleteGroup(CraftingTool.sbook.name,e.." List")
@@ -796,21 +798,20 @@ function updateSkillBook()
 	
 	if(Skills) then
 		for i=1,#Skills do
-			local skill = CraftingTool.Skill:New(Skills[i], nil, false) -- skill table, condition table, whether CC or not
-			addSkillBookEntry(skill)
+			Skills[i]["CC"] = false
+			addSkillBookEntry(Skills[i])
 		end
 	end
 	
 	if(CrossClass and gSBshowCC == "1") then
 		for prof,skilllist in pairs(CrossClass) do
 			if(prof ~= gSBprof and skilllist) then
-				local sprof = "gMW"..prof
+				local sprof = "gCC"..prof
 				GUI_NewField(CraftingTool.sbook.name, prof, sprof, "Cross Class")
 				_G[sprof] = "Skills"
 				for i=1,#skilllist do
-					local skill = CraftingTool.Skill:New(skilllist[i], nil, true)
-					skill["CC"] = true
-					addSkillBookEntry(skill, "Cross Class")
+					skilllist[i]["CC"] = true
+					addSkillBookEntry(skilllist[i], "Cross Class")
 				end
 			end
 		end
@@ -833,13 +834,14 @@ function addSkillBookEntry ( skill, groupName )
 end
 
 function CraftingTool.AddSkillToProfile( sname )
-	local skill = CraftingTool.SkillBook[sname]
-	skill.prio = TableSize(CraftingTool.Profile.Skills) + 1
+	local skilldetails = getSkillDetails(gSBprof, "id", tonumber(CraftingTool.SkillBook[sname].id))
 	d("Adding skill: "..sname)
-	if(skill["CC"]) then d(skill.name) end
+	local skill = CraftingTool.Skill:New(skilldetails)
+	--d(skill)
 	if (skill ~= nil) then
 		if(CraftingTool.Profile.Name and CraftingTool.Profile.Name ~= "" and CraftingTool.Profile.Name ~= "None") then
 			skill["on"] = "1"
+			skill.prio = TableSize(CraftingTool.Profile.Skills) + 1
 			value = 0
 			for e,i in pairs({ "iqstacks", "cp", "step", "progress", "quality", "durability", "description1", "description2", "buffid", "notbuffid" }) do
 				if(i:match("description")) then
@@ -864,26 +866,23 @@ end
 --[[ Skill Manager Functions ]]--
 function CraftingTool.AddSkillManagerEntry(skill, y)
 	if (skill) then
-		local sname = skill.name
+		local uid = skill.uid
 		local bname = "["..tostring(y or skill.prio).."] "..skill.name .. " [" .. ((skill.on == "1") and "+" or "-") .. "]"
 		
-		local i = 0
-		--[[while(( CraftingTool.EventsRegistered[sname.."["..i.."]"] ~= nil )) do
-			i = i + 1
-		end]]--
-		sname = sname .. "["..i.."]"
+		if (CraftingTool.EventsRegistered[uid] == nil) then
+			RegisterEventHandler( uid, CraftingTool.SkillView)
+			CraftingTool.EventsRegistered[uid] = 1
+		end
 		
-		GUI_NewButton(CraftingTool.smanager.name, bname, sname, "Skill List")
-		RegisterEventHandler( sname, CraftingTool.SkillView)
-		CraftingTool.EventsRegistered[sname] = 1
+		GUI_NewButton(CraftingTool.smanager.name, bname, uid, "Skill List")
 	end
 end
 
 --[[ Skill View Functions ]]--
 function updateSkillFromView( varname, value ) -- Updates the skill inside the Profile. Not the file.
 	--d("List Position: "..id.." Skill ID: "..gSVid .. " VarName: " .. varname)
-	local id = CraftingTool.Profile.Skills:getListPos(CraftingTool.Profile.Skills:getSkillById(tonumber(gSVid)))
-	if(id ~= 0) then
+	local skill = CraftingTool.Profile.Skills:getSkillByUID(tonumber(CraftingTool.CurrentlyOpenUID))
+	if(skill ~= 0) then
 		local key = string.match(varname, "gSV(%w+)")
 		key = key:lower():gsub("condition", "description")
 		local ctype = "None"
@@ -895,12 +894,12 @@ function updateSkillFromView( varname, value ) -- Updates the skill inside the P
 		if(key == "iqstacks") then ctype = ">=" end
 				
 		if(key == "id" or key=="name" or key=="on" or key=="prio") then
-			CraftingTool.Profile.Skills[id][key] = value
+			skill[key] = value
 			if(not CraftingTool.openingSkill) then CraftingTool.Profile:Update() end
 		elseif(key:match("description")) then
-			CraftingTool.Profile.Skills[id]:FindCondition(key, ctype, tostring(value))
+			skill:FindCondition(key, ctype, tostring(value))
 		else
-			CraftingTool.Profile.Skills[id]:FindCondition(key, ctype, tonumber(value))
+			skill:FindCondition(key, ctype, tonumber(value))
 		end
 	end
 end
@@ -976,9 +975,10 @@ function CraftingTool.SkillMngr( dir )
 	GUI_WindowVisible(CraftingTool.smanager.name,true)
 end
 
-function CraftingTool.SkillView( sname )
-	sname = sname:gsub("%[(%d+)%]", "")
-	local skill = CraftingTool.Profile.Skills:getSkillByName(sname)
+function CraftingTool.SkillView( uid )
+	CraftingTool.CurrentlyOpenUID = tonumber(uid)
+	--d(uid.." "..tostring(CraftingTool.CurrentlyOpenUID))
+	local skill = CraftingTool.Profile.Skills:getSkillByUID(uid)
 	local level = skill:FindCondition("level","<=") or "CC"
 	CraftingTool.UpdateView(skill, opening)
 end
@@ -998,7 +998,7 @@ end
 function CraftingTool.SkillViewHandler( dir )
 	if(dir == "DELETE") then
 		if ( TableSize(CraftingTool.Profile.Skills) > 0 ) then
-			CraftingTool.Profile.Skills:Remove(CraftingTool.Profile.Skills:getSkillById(tonumber(gSVid)))
+			CraftingTool.Profile.Skills:Remove(CraftingTool.Profile.Skills:getSkillByUID(tonumber(CraftingTool.CurrentlyOpenUID)))
 			CraftingTool.Profile:Update()
 			GUI_WindowVisible(CraftingTool.sview.name,false)
 		end
