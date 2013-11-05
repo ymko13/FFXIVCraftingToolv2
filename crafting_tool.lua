@@ -219,12 +219,14 @@ end
 function CraftingTool.Skill:Evaluate() -- true if all pass, false if one does not pass (Every condition added that is not in the standard roster needs to have a value leached from somewhere, check in this function)
 	local result = true
 	
-	local condition1 = nil
 	if(gDBcresults == "1") then
 		local uid = tostring(self.uid)
 		local i = uid:gsub(tostring(self.id),"")
 		d("<<< Checking: "..self.name.." >>> " .. ((i == '' or i ==' ') and "0" or i))
 	end
+	
+	local condition1 = nil
+
 	for i=1,#self.Condition do
 		local value = 0
 		local condition = self.Condition[i]
@@ -240,8 +242,15 @@ function CraftingTool.Skill:Evaluate() -- true if all pass, false if one does no
 		--Default Checks--
 		if(ctype == "level") then value = Player.level end
 		
-		result = condition:Evaluate(value) -- you pass in the value    
-		
+		if(ctype:match("description")) then
+			if(condition1) then
+				result = condition:Evaluate(value) or condition1:Evaluate(value)
+			else
+				condition1 = condition
+			end
+		else
+			result = condition:Evaluate(value) -- you pass in the value    
+		end
 		if(not result) then break end
 	end
 	
@@ -945,7 +954,7 @@ function CraftingTool.Craft( dir )
 		CraftingTool.doNonStopCraft = false
 		CraftingTool.doLimitedCraft = false
 		
-		if(gMWHowToCraft == "Non Stop") then
+		if(gMWHowToCraft == "Until Stopped") then
 			CraftingTool.doNonStopCraft = true
 		elseif(gMWHowToCraft == "Single") then
 			CraftingTool.craftsLeft = 1
