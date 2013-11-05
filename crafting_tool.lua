@@ -67,9 +67,9 @@ function CraftingTool.SkillList:Add( value, valuename )
 end
 
 function CraftingTool.SkillList:Remove ( value )
-	local id = value.id
+	local uid = value.uid
 	for i,e in pairs(self) do
-		if(e.id == id) then
+		if(e.uid == uid) then
 			e:Destructor()
 			table.remove(self,i)
 			break
@@ -357,7 +357,7 @@ function CraftingTool.Profile:Read(filename)
 						if(skilldetails) then
 							skill = CraftingTool.Skill:New(skilldetails)
 						end
-						d(skill)
+						--d(skill)
 					elseif(skill and key=="name" or key=="on" or key=="prio") then
 						skill[key] = value
 					elseif(skill and key == "end") then
@@ -428,7 +428,7 @@ function CraftingTool.Profile:Write(filename)
 		d("Full path: "..filepath)
 		local writeStr = "CT_Prof="..gSBprof.."\n"
 		for i, skill in pairs(self.Skills) do
-			d(skill)
+			--d(skill)
 			writeStr = writeStr.."CT_ID="..skill.id.."\n"
 			writeStr = writeStr.."CT_NAME="..skill.name.."\n"
 			
@@ -480,7 +480,7 @@ function CraftingTool.Profile:IsUniqueSkill( uid ) -- return whether the skill w
 	for i,e in pairs(self.Skills) do
 		if(e.uid == tonumber(uid)) then
 			unique = false
-			d(e.uid)
+			--d(e.uid)
 			break
 		end
 	end
@@ -832,7 +832,7 @@ function CraftingTool.AddSkillToProfile( sname )
 	d("Adding skill: "..sname)
 	local skill = CraftingTool.Skill:New(skilldetails)
 	--d(skill)
-	if (skill ~= nil) then
+	if (skill ~= nil or skill == {}) then
 		if(CraftingTool.Profile.Name and CraftingTool.Profile.Name ~= "" and CraftingTool.Profile.Name ~= "None") then
 			skill["on"] = "1"
 			skill.prio = TableSize(CraftingTool.Profile.Skills) + 1
@@ -863,12 +863,8 @@ function CraftingTool.AddSkillManagerEntry(skill, y)
 		local uid = skill.uid
 		local bname = "["..tostring(y or skill.prio).."] "..skill.name .. " [" .. ((skill.on == "1") and "+" or "-") .. "]"
 		
-		if (CraftingTool.EventsRegistered[uid] == nil) then
-			RegisterEventHandler( uid, CraftingTool.SkillView)
-			CraftingTool.EventsRegistered[uid] = 1
-		end
-		
 		GUI_NewButton(CraftingTool.smanager.name, bname, uid, "Skill List")
+		RegisterEventHandler( uid, CraftingTool.SkillView )
 	end
 end
 
@@ -992,7 +988,8 @@ end
 function CraftingTool.SkillViewHandler( dir )
 	if(dir == "DELETE") then
 		if ( TableSize(CraftingTool.Profile.Skills) > 0 ) then
-			CraftingTool.Profile.Skills:Remove(CraftingTool.Profile.Skills:getSkillByUID(tonumber(CraftingTool.CurrentlyOpenUID)))
+			local uid = tonumber(CraftingTool.CurrentlyOpenUID)
+			CraftingTool.Profile.Skills:Remove(CraftingTool.Profile.Skills:getSkillByUID(uid))
 			CraftingTool.Profile:Update()
 			GUI_WindowVisible(CraftingTool.sview.name,false)
 		end
