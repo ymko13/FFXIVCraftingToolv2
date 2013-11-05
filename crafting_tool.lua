@@ -325,6 +325,12 @@ CraftingTool.EventsRegistered = {}
 CraftingTool.SkillBook = {}
 CraftingTool.lastQuality = 0
 CraftingTool.CurrentlyOpenUID = 0
+CraftingTool.KeyPressLog = {
+	Ctrl = false,
+	Shift = false,
+	Key_S = false,
+	Key_G = false }
+
 --[[ Profile Class ]]--
 CraftingTool.Profile = {
 	Name = "",
@@ -410,6 +416,7 @@ function CraftingTool.Profile:Read(filename)
 			
 			self.Name = filename
 			self.Prof = prof
+			gSBprof = prof
 			
 			--GUI call and sort
 			if ( TableSize(self.Skills) > 0 ) then
@@ -521,9 +528,22 @@ function CraftingTool.Update(Event, ticks)  -- MAIN LOOP
 		CraftingTool.customDelay = tonumber(gMWcdelay)
 		gMWcraftsleft = CraftingTool.craftsLeft
 		
+		LogKeyPress()
+		if(CraftingTool.KeyPressLog.Ctrl and CraftingTool.KeyPressLog.Shift) then -- Left Ctrl + Shift 
+			if(CraftingTool.KeyPressLog.Key_S) then -- + S single
+				CraftingTool.craftsLeft = 1
+				CraftingTool.doLimitedCraft = true
+				CraftingTool.doNonStopCraft = false
+				LogKeyPress("reset")
+			elseif(CraftingTool.KeyPressLog.Key_G) then -- + G Unlimited
+				CraftingTool.doNonStopCraft = true
+				CraftingTool.doLimitedCraft = false
+				LogKeyPress("reset")
+			end
+		end
+		
 		if((ticks - CraftingTool.lastUse >= CraftingTool.customDelay) and CraftingTool.Profile.Prof ~= "" and CraftingTool.cProf[CraftingTool.Profile.Prof].id == Player.job) then
 			local keepCrafting = (CraftingTool.doNonStopCraft or CraftingTool.doLimitedCraft)
-			
 			if(CraftingTool.currentSynth) then -- Synth logic
 					gMWcrafting = "true"
 					gMWitemid = CraftingTool.currentSynth.itemid
@@ -587,14 +607,12 @@ end
 --[[ GUI Update ]]--
 function CraftingTool.GUIVARUpdate(Event, NewVals, OldVals)
 	for k,v in pairs(NewVals) do
-		if(k == "gSBprof" or k == "gSBshowCC") then 
-			updateSkillBook()
-		elseif(k == "gSMselectedProfile") then
+		if(k == "gSMselectedProfile") then
 			Settings.CraftingTool.gSMselectedProfile = gSMselectedProfile
 			CraftingTool.Profile:Read(gSMselectedProfile)
 		elseif(string.match(k, "gSV")) then 
 			updateSkillFromView(k,v)
-		elseif(k:match("gMW")) then
+		elseif(k:match("gMW") or k == "gSBprof" or k == "gSBshowCC") then
 			Settings.CraftingTool[tostring(k)] = v
 		end
 	end
@@ -629,9 +647,11 @@ function MainWindow()
 	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Add Cond", "gDBcadd", "Debug")
 	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Edit Cond", "gDBcedit", "Debug")
 	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Evaluate Cond", "gDBcresults", "Debug")
+	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Log Key Press", "gDBlogkeys", "Debug")
 	gDBcadd = "0"
 	gDBcedit = "0"
 	gDBcresults = "0"
+	gDBlogkeys = "0"
 	
 	--Info Window 
 	GUI_NewField(CraftingTool.mainwindow.name,"Crafting","gMWcrafting", "Info")
@@ -716,13 +736,15 @@ function SkillBook()
 	
 	GUI_UnFoldGroup(CraftingTool.sbook.name,"Settings")
 	
-	updateSkillBook()
+	GUI_NewButton(CraftingTool.sbook.name, "Update Skills", "updateSkills")
+	RegisterEventHandler("updateSkills", updateSkillBook)
 end
 
 --Initialises SkillMngr Window
 function SkillMngr()
 	--Skill manager settings
 	GUI_NewComboBox(CraftingTool.smanager.name, "Profile","gSMselectedProfile", "Settings", " ")
+	GUI_NewButton(CraftingTool.smanager.name, "Refresh Profile List", "Refresh List", "Settings")
 	
 	 CraftingTool.Profile:UpdateProfileList()
 
@@ -743,6 +765,7 @@ function SkillMngr()
 	RegisterEventHandler("Create New", CraftingTool.SkillManagerHandler)
 	RegisterEventHandler("Skill Book", CraftingTool.SkillManagerHandler)
 	RegisterEventHandler("Save Profile", CraftingTool.SkillManagerHandler)
+	RegisterEventHandler("Refresh List", CraftingTool.SkillManagerHandler)
 	CraftingTool.Profile:Read(gSMselectedProfile)
 end
 
@@ -786,7 +809,7 @@ function SkillView()
 end
 
 --[[ Skill Book Functions ]]--
-function updateSkillBook()
+function updateSkillBook( dir )
 	CraftingTool.Profile.Prof = gSBprof
 	local Skills = getSkills(gSBprof)
 	local CrossClass = getSkills("CrossClass")
@@ -993,6 +1016,8 @@ function CraftingTool.SkillManagerHandler( dir )
 		GUI_WindowVisible(CraftingTool.sbook.name,true)
 	elseif(dir == "Save Profile") then
 		CraftingTool.Profile:Write(gSMselectedProfile)
+	elseif(dir == "Refresh List") then
+		CraftingTool.Profile:UpdateProfileList()
 	end
 end
 
@@ -1038,6 +1063,27 @@ function PlayerHasBuff(id) -- Returns a buffid of the buff needing to be recast
 		end
 	end
 	return hasBuff
+end
+
+function LogKeyPress( somevar )
+	if(somevar == "reset") then
+		CraftingTool.KeyPressLog = {
+			Ctrl = false,
+			Shift = false,
+			Key_S = false,
+			Key_U = false }
+	end
+	CraftingTool.KeyPressLog.Ctrl = MeshManager:IsKeyPressed(162)
+	CraftingTool.KeyPressLog.Shift = MeshManager:IsKeyPressed(160)
+	CraftingTool.KeyPressLog.Key_S = MeshManager:IsKeyPressed(83)
+	CraftingTool.KeyPressLog.Key_G = MeshManager:IsKeyPressed(71)
+	
+	if(gDBlogkeys == "1") then
+		if(CraftingTool.KeyPressLog.Ctrl) then d("Ctrl: " .. tostring(CraftingTool.KeyPressLog.Ctrl)) end 
+		if(CraftingTool.KeyPressLog.Shift) then d("Shift: " .. tostring(CraftingTool.KeyPressLog.Shift)) end
+		if(CraftingTool.KeyPressLog.Key_S) then d("Key_S: " .. tostring(CraftingTool.KeyPressLog.Key_S)) end 
+		if(CraftingTool.KeyPressLog.Key_G) then d("Key_G: " .. tostring(CraftingTool.KeyPressLog.Key_G)) end
+	end
 end
 
 -- formula based on http://www.bluegartr.com/threads/117684-The-crafting-thread.?p=5890541&viewfull=1#post5890541
