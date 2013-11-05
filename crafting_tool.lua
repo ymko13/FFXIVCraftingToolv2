@@ -506,66 +506,68 @@ end
 
 --Pulse from game loop
 function CraftingTool.Update(Event, ticks)  -- MAIN LOOP
-	CraftingTool.currentSynth = Crafting:SynthInfo()
-	CraftingTool.customDelay = tonumber(gMWcdelay)
-	gMWcraftsleft = CraftingTool.craftsLeft
-	
-	if((ticks - CraftingTool.lastUse >= CraftingTool.customDelay) and CraftingTool.Profile.Prof ~= "" and CraftingTool.cProf[CraftingTool.Profile.Prof].id == Player.job) then
-		local keepCrafting = (CraftingTool.doNonStopCraft or CraftingTool.doLimitedCraft)
+	if( gSMactive == "1" ) then
+		CraftingTool.currentSynth = Crafting:SynthInfo()
+		CraftingTool.customDelay = tonumber(gMWcdelay)
+		gMWcraftsleft = CraftingTool.craftsLeft
 		
-		if(gSMactive == "1" and CraftingTool.currentSynth) then -- Synth logic
-				gMWcrafting = "true"
-				gMWitemid = CraftingTool.currentSynth.itemid
-				
-				if(CraftingTool.lastQuality ~= CraftingTool.currentSynth.quality and PlayerHasBuff(CraftingTool.IQBuffID)) then CraftingTool.IQStacks = CraftingTool.IQStacks + 1 end
-								
-				local skill_list = CraftingTool.Profile.Skills
-				local casted = false
-				
-				for i=1,TableSize(skill_list) do --Loop through all the skills and select a skill which has the lowest(best) priorty and meets all the criteria
-					local skill = skill_list[i]
-					--d("Skill: " .. skill.name)
-					local use = skill:Evaluate()
-					if(use and tonumber(skill.on) == 1) then
-						casted = true
-						skill:Use()
-						gMWlastskill = skill:Get("name")
-						d("< Casted: " .. gMWlastskill .. " >")
-						CraftingTool.lastUse = ticks + skill.WaitTime
-						break
+		if((ticks - CraftingTool.lastUse >= CraftingTool.customDelay) and CraftingTool.Profile.Prof ~= "" and CraftingTool.cProf[CraftingTool.Profile.Prof].id == Player.job) then
+			local keepCrafting = (CraftingTool.doNonStopCraft or CraftingTool.doLimitedCraft)
+			
+			if(CraftingTool.currentSynth) then -- Synth logic
+					gMWcrafting = "true"
+					gMWitemid = CraftingTool.currentSynth.itemid
+					
+					if(CraftingTool.lastQuality ~= CraftingTool.currentSynth.quality and PlayerHasBuff(CraftingTool.IQBuffID)) then CraftingTool.IQStacks = CraftingTool.IQStacks + 1 end
+									
+					local skill_list = CraftingTool.Profile.Skills
+					local casted = false
+					
+					for i=1,TableSize(skill_list) do --Loop through all the skills and select a skill which has the lowest(best) priorty and meets all the criteria
+						local skill = skill_list[i]
+						--d("Skill: " .. skill.name)
+						local use = skill:Evaluate()
+						if(use and tonumber(skill.on) == 1) then
+							casted = true
+							skill:Use()
+							gMWlastskill = skill:Get("name")
+							d("< Casted: " .. gMWlastskill .. " >")
+							CraftingTool.lastUse = ticks + skill.WaitTime
+							break
+						end
 					end
-				end
-				
-				gMWiqstacks = CraftingTool.IQStacks
-				
-				if(casted) then
-					CraftingTool.lastQuality = CraftingTool.currentSynth.quality 
+					
+					gMWiqstacks = CraftingTool.IQStacks
+					
+					if(casted) then
+						CraftingTool.lastQuality = CraftingTool.currentSynth.quality 
+					else
+						d("Can't cast anything please check that your profile is set up correctly")
+					end
+			elseif(keepCrafting) then
+				if (not Crafting:IsCraftingLogOpen()) then
+					Crafting:ToggleCraftingLog()
 				else
-					d("Can't cast anything please check that your profile is set up correctly")
-				end
-		elseif(keepCrafting) then
-			if (not Crafting:IsCraftingLogOpen()) then
-				Crafting:ToggleCraftingLog()
-			else
-				gMWcrafting = "false"
-				gMWitemid = 0
-				gMWiqstacks = 0
-				CraftingTool.IQStacks = 0
-				CraftingTool.lastQuality = 0
-				gMWlastskill = "None"
-				--gMWnq = "0"
-				--gMWqh = "0"
-				d("<< Crafting Item >>")
-				Crafting:CraftSelectedItem()
-				Crafting:ToggleCraftingLog()
-				CraftingTool.lastUse = ticks + 4500
-				if(CraftingTool.doLimitedCraft and CraftingTool.craftsLeft <= 1) then
-					CraftingTool.doLimitedCraft = false
-					CraftingTool.craftsLeft = 0
-				elseif(CraftingTool.doNonStopCraft) then
-					gMWcraftsleft = 0
-				else
-					CraftingTool.craftsLeft = CraftingTool.craftsLeft - 1
+					gMWcrafting = "false"
+					gMWitemid = 0
+					gMWiqstacks = 0
+					CraftingTool.IQStacks = 0
+					CraftingTool.lastQuality = 0
+					gMWlastskill = "None"
+					--gMWnq = "0"
+					--gMWqh = "0"
+					d("<< Crafting Item >>")
+					Crafting:CraftSelectedItem()
+					Crafting:ToggleCraftingLog()
+					CraftingTool.lastUse = ticks + 4500
+					if(CraftingTool.doLimitedCraft and CraftingTool.craftsLeft <= 1) then
+						CraftingTool.doLimitedCraft = false
+						CraftingTool.craftsLeft = 0
+					elseif(CraftingTool.doNonStopCraft) then
+						gMWcraftsleft = 0
+					else
+						CraftingTool.craftsLeft = CraftingTool.craftsLeft - 1
+					end
 				end
 			end
 		end
