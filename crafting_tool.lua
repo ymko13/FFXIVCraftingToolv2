@@ -188,10 +188,10 @@ function CraftingTool.Skill:AddCondition( condition ) --adds a condition to the 
 	end
 	
 	if(self:FindCondition(condition.Type, condition.Condition)) then
-		--d("Condition already exists, augmenting it's value")
+		if(gDBcadd == "1") then d("Condition already exists, augmenting it's value") end
 		self:FindCondition(condition.Type, condition.Condition, condition.Value)
 	else
-		--d(("Skill ID: %7d"):format((self.id or 0)) .. " TSize: " .. #self.Condition + 1 .. " => " .. ("New condition: ^%s %s %s^"):format(condition.Value, condition.Condition, condition.Type))
+		if(gDBcadd == "1") then d(("Skill ID: %7d"):format((self.id or 0)) .. " TSize: " .. #self.Condition + 1 .. " => " .. ("New condition: ^%s %s %s^"):format(condition.Value, condition.Condition, condition.Type)) end
 		table.insert(self.Condition, #self.Condition + 1, condition)
 	end
 end
@@ -205,14 +205,14 @@ function CraftingTool.Skill:FindCondition( Type, Condition, modVal ) -- If you p
 		if(self.Condition[i].Type == Type and self.Condition[i].Condition == Condition) then
 			if(modVal ~= "") then
 				self.Condition[i].Value = modVal
-				--d(self.id .. " Changing Condition => ''" .. self.Condition[i].Value .. " " .. self.Condition[i].Condition .. " " .. self.Condition[i].Type .. "''")
+				if(gDBcedit == "1") then d(self.id .. " Changing Condition => ''" .. self.Condition[i].Value .. " " .. self.Condition[i].Condition .. " " .. self.Condition[i].Type .. "''") end
 			end
 			value = self.Condition[i].Value
 			result = true
 		end
 		if(result) then break end
 	end
-	--if(not result) then d("Couldn't find condition: " .. Type .. " " .. Condition .. " for skill " .. self.name) end
+	if(gDBcedit == "1" and not result) then d("Couldn't find condition: " .. Type .. " " .. Condition .. " for skill " .. self.name) end
 	return value
 end
 
@@ -220,22 +220,25 @@ function CraftingTool.Skill:Evaluate() -- true if all pass, false if one does no
 	local result = true
 	
 	local condition1 = nil
-	
+	if(gDBcresults == "1") then
+		local uid = tostring(self.uid)
+		local i = uid:gsub(tostring(self.id),"")
+		d("<<< Checking: "..self.name.." >>> " .. ((i == '' or i ==' ') and "0" or i))
+	end
 	for i=1,#self.Condition do
 		local value = 0
 		local condition = self.Condition[i]
+		local ctype = string.lower(condition.Type)
 		
+		value = CraftingTool.currentSynth[ctype]
 		
-		value = CraftingTool.currentSynth[string.lower(condition.Type)]
-		
-		if(string.lower(condition.Type):match("description")) then value = CraftingTool.currentSynth.description end -- description check
+		if(ctype:match("description")) then value = CraftingTool.currentSynth.description end -- description check
 		    
-		if(string.lower(condition.Type) == "cp") then value = Player.cp.current end
-		if(string.lower(condition.Type) == "buffid" or string.lower(condition.Type) == "notbuffid") then value = 1 end
-		if(string.lower(condition.Type) == "iqstacks") then value = CraftingTool.IQStacks end
+		if(ctype == "cp" or ctype == "enoughcp") then value = Player.cp.current end
+		if(ctype == "buffid" or ctype == "notbuffid") then value = 1 end
+		if(ctype == "iqstacks") then value = CraftingTool.IQStacks end
 		--Default Checks--
-		if(string.lower(condition.Type) == "level") then value = Player.level end
-		if(string.lower(condition.Type) == "enoughcp") then value = Player.cp.current end
+		if(ctype == "level") then value = Player.level end
 		
 		result = condition:Evaluate(value) -- you pass in the value    
 		
@@ -296,11 +299,9 @@ function CraftingTool.Condition:Evaluate(Value) -- pass in the value to test aga
 			result = ( tonumber(self.Value) == tonumber(Value) )
 		end
 	end
-	--[[if(result) then
-		d("Result is true for: " .. self.Type .. " as " .. self.Value .. " " .. self.Condition .. " " .. Value)
-	else
-		d("Result is false for: " .. self.Type .. " as " .. self.Value .. " " .. self.Condition .. " " .. Value)
-	end]]--
+	if(gDBcresults == "1") then
+		d("Result is ".. tostring(result) .." for: " .. self.Type .. " as " .. self.Value .. " " .. self.Condition .. " " .. Value)
+	end
 	return result
 end
 --[[ End of Condition Class ]]--
@@ -614,22 +615,14 @@ function CraftingTool.ModuleInit()
 end
 
 --Initialises CraftingTool Window
-function MainWindow()	
-	--[[Prof Selection
-	GUI_NewComboBox(CraftingTool.mainwindow.name,"Profession","gMWCraftProf", "Profession Selection", "None")
-	
-	gMWCraftProf_listitems = ""
-	for i,e in pairs(CraftingTool.cProf) do
-		gMWCraftProf_listitems = gMWCraftProf_listitems..","..i
-	end
-	
-	if (Settings.CraftingTool.gMWCraftProf == nil) then
-		Settings.CraftingTool.gMWCraftProf = "Carpenter"
-	end
-	gMWCraftProf = Settings.CraftingTool.gMWCraftProf
-	
-	GUI_UnFoldGroup(CraftingTool.mainwindow.name,"Profession Selection")
-	]]--
+function MainWindow()
+	--debug window
+	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Add Cond", "gDBcadd", "Debug")
+	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Edit Cond", "gDBcedit", "Debug")
+	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Evaluate Cond", "gDBcresults", "Debug")
+	gDBcadd = "0"
+	gDBcedit = "0"
+	gDBcresults = "0"
 	
 	--Info Window 
 	GUI_NewField(CraftingTool.mainwindow.name,"Crafting","gMWcrafting", "Info")
@@ -684,17 +677,19 @@ function MainWindow()
 	
 	--Craft Window
 	GUI_NewNumeric(CraftingTool.mainwindow.name, "Craft Amount", "gMWCraftFor", "Craft")
-	GUI_NewComboBox(CraftingTool.mainwindow.name,"How To Craft","gMWHowToCraft", "Craft", "Until Stopped,Single,Limited,Stop")
-	gHowToCraft = "Until Stopped"
-	GUI_NewButton(CraftingTool.mainwindow.name, "Start \\ Stop", "CraftingTool.Craft","Craft") 
+	GUI_NewComboBox(CraftingTool.mainwindow.name,"How To Craft","gMWHowToCraft", "Craft", "Until Stopped,Single,Limited")
+	gMWHowToCraft = "Until Stopped"
+	GUI_NewButton(CraftingTool.mainwindow.name, "Start", "StartCraft","Craft") 
+	GUI_NewButton(CraftingTool.mainwindow.name, "Stop", "StopCraft","Craft") 
 	--
 	
 	--Buttons at the bottom
-	GUI_NewButton(CraftingTool.mainwindow.name, "Skill Manager", "CraftingTool.SkillMngr") 
+	GUI_NewButton(CraftingTool.mainwindow.name, "Skill Manager", "OpenSkillMngr") 
 	--
 	
-	RegisterEventHandler("CraftingTool.Craft", CraftingTool.Craft)
-	RegisterEventHandler("CraftingTool.SkillMngr", CraftingTool.SkillMngr)
+	RegisterEventHandler("StartCraft", CraftingTool.Craft)
+	RegisterEventHandler("StopCraft", CraftingTool.Craft)
+	RegisterEventHandler("OpenSkillMngr", CraftingTool.SkillMngr)
 end
 
 --Initialises SkillBook
@@ -946,18 +941,23 @@ end
 
 --[[ Button Handlers ]]--
 function CraftingTool.Craft( dir )
-	CraftingTool.doNonStopCraft = false
-	CraftingTool.doLimitedCraft = false
-	
-	if(gMWHowToCraft == "Non Stop") then
-		CraftingTool.doNonStopCraft = true
-		gMWHowToCraft = "Stop"
-	elseif(gMWHowToCraft == "Single") then
-		CraftingTool.craftsLeft = 1
-		CraftingTool.doLimitedCraft = true
-	elseif(gMWHowToCraft == "Limited") then
-		CraftingTool.craftsLeft = tonumber(gMWCraftFor)
-		CraftingTool.doLimitedCraft = true
+	if(dir == "StartCraft") then
+		CraftingTool.doNonStopCraft = false
+		CraftingTool.doLimitedCraft = false
+		
+		if(gMWHowToCraft == "Non Stop") then
+			CraftingTool.doNonStopCraft = true
+		elseif(gMWHowToCraft == "Single") then
+			CraftingTool.craftsLeft = 1
+			CraftingTool.doLimitedCraft = true
+		elseif(gMWHowToCraft == "Limited") then
+			CraftingTool.craftsLeft = tonumber(gMWCraftFor)
+			CraftingTool.doLimitedCraft = true
+		end
+	elseif(dir == "StopCraft") then
+		CraftingTool.doNonStopCraft = false
+		CraftingTool.doLimitedCraft = false
+		CraftingTool.craftsLeft = 0
 	end
 end
 
