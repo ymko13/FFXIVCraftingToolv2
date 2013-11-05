@@ -339,6 +339,8 @@ function CraftingTool.Profile:Read(filename)
 	if ( filename and filename ~= "") then
 		local profile = fileread(CraftingTool.profilepath..filename..".lua")
 		if ( TableSize(profile) > 0) then
+			self.Skills = CraftingTool.SkillList:New()
+			self:Update()
 			local prof = ""
 			local skill = {}
 			local conditionlist = ""
