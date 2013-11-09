@@ -11,9 +11,9 @@ CraftingTool={ }
 CraftingTool.profilepath = GetStartupPath() .. [[\LuaMods\CraftingTool\Profiles\]];
 --[[ Window Settings ]]--
 CraftingTool.mainwindow = { name = "CraftingTool", x = 500, y = 200, w = 220, h = 300 }
-CraftingTool.smanager = { name = "CraftingTool_SkillManager", x = CraftingTool.mainwindow.x + CraftingTool.mainwindow.w, y = 200, w = 220, h = 300 }
-CraftingTool.sbook = { name = "CraftingTool_SkillBook", x = CraftingTool.smanager.x + CraftingTool.smanager.w, y = 200, w = 300, h = 500 }
-CraftingTool.sview = { name = "CraftingTool_SkillView", x = 0, y = 0, w = 250, h = 500 }
+CraftingTool.smanager = { name = "CraftingTool_SkillManager", x = CraftingTool.mainwindow.x + CraftingTool.mainwindow.w, y = 200, w = 250, h = 300 }
+CraftingTool.sbook = { name = "CraftingTool_SkillBook", x = CraftingTool.smanager.x + CraftingTool.smanager.w, y = 200, w = 250, h = 500 }
+CraftingTool.sview = { name = "CraftingTool_SkillView", x = 0, y = 0, w = 230, h = 580 }
 
 --[[ Crafting States ]]--
 CraftingTool.doNonStopCraft = false --Used for non-stop craft
@@ -92,7 +92,7 @@ function CraftingTool.SkillList:getSkillByUID( skillUID )
 	local skill = nil
 	
 	for i,e in pairs(self) do
-		if(e.uid == tonumber(skillUID)) then
+		if(type(e) == "table" and e.uid == tonumber(skillUID)) then
 			skill = e
 			break
 		end
@@ -113,13 +113,40 @@ function CraftingTool.SkillList:getSkillByName( skillName )
 	
 	return skill
 end
+
+function CraftingTool.SkillList:sort()
+	local sortfunc = (function(a,b) return tonumber(a.prio) < tonumber(b.prio) end)
+	table.sort(self, sortfunc)
+	for i=1, #self do
+		if(type(self[i]) == "table") then
+			self[i].prio = i
+		end
+	end
+end
+
+function CraftingTool.SkillList:ChangePrio( skillUID , value )
+	local tableSize = TableSize(self)
+	
+	local skill = self:getSkillByUID(skillUID)
+	local newPrio = skill.prio + value
+	local sNewPrio = Limit(newPrio, 1, tableSize)
+	
+	if(newPrio > 0 and newPrio <= tableSize) then
+		local skill2 = self[sNewPrio]
+		local s2NewPrio = Limit(skill2.prio - value, 1, tableSize)
+		skill2.prio = s2NewPrio
+	end
+	skill.prio = sNewPrio
+	self:sort()
+end
 --[[ End of Skill List Class ]]--
 
 --[[ Basic Skill Class ]]--
 CraftingTool.Skill = { -- Can have many params like  ["id"] = 0, ["name"] = "", ["level"] = "", ["cost"] = "", ["actionType"] = "", ["buffid"] = "", ["length"] = "", ["efficiency"] = "", ["chance"] = ""
 	WaitTime=0,
 	Condition = {},
-	on = 0
+	on = 0,
+	duracheck = 0
 }
 
 function CraftingTool.Skill:New( skilldetails ) -- Creates a new variable of class CraftingTool.Skill requires skill details leached from Prof.lua files and a boolean stating whether its cross class or not(default false)
@@ -146,6 +173,8 @@ function CraftingTool.Skill:New( skilldetails ) -- Creates a new variable of cla
 	for i,e in pairs (skilldetails) do
 		newskill[i] = e
 	end
+	
+	newskill:AddDefConditions(CC)
 	
 	return newskill
 end
@@ -228,21 +257,26 @@ function CraftingTool.Skill:Evaluate() -- true if all pass, false if one does no
 	local condition1 = nil
 
 	for i=1,#self.Condition do
-		local value = 0
-		local condition = self.Condition[i]
-		local ctype = string.lower(condition.Type)
+		local duracheck = true
+		if(self.duracheck == "1") then duracheck = (CraftingTool.currentSynth.durabilitymax > 40) end
 		
-		value = CraftingTool.currentSynth[ctype]
-		
-		if(ctype:match("description")) then value = CraftingTool.currentSynth.description end -- description check
-		    
-		if(ctype == "cp" or ctype == "enoughcp") then value = Player.cp.current end
-		if(ctype == "buffid" or ctype == "notbuffid") then value = 1 end
-		if(ctype == "iqstacks") then value = CraftingTool.IQStacks end
-		--Default Checks--
-		if(ctype == "level") then value = Player.level end
-		
-		if(ctype:match("description")) then
+		if(duracheck) then
+			local value = 0
+			local condition = self.Condition[i]
+			local ctype = string.lower(condition.Type)
+			
+			value = CraftingTool.currentSynth[ctype]
+			
+			if(ctype:match("description")) then value = CraftingTool.currentSynth.description end -- description check
+
+			if(ctype == "cp" or ctype == "enoughcp") then value = Player.cp.current end
+			if(ctype == "buffid" or ctype == "notbuffid") then value = 1 end
+			if(ctype == "iqstacks") then value = CraftingTool.IQStacks end
+			if(ctype == "progress" or ctype == "quality") then value = math.floor(value / CraftingTool.currentSynth[ctype.."max"] * 100) end
+			--Default Checks--
+			if(ctype == "level") then value = Player.level end
+			
+			if(ctype:match("description")) then
 			if(condition1) then
 				result = condition:Evaluate(value) or condition1:Evaluate(value)
 			else
@@ -250,6 +284,9 @@ function CraftingTool.Skill:Evaluate() -- true if all pass, false if one does no
 			end
 		else
 			result = condition:Evaluate(value) -- you pass in the value    
+		end
+		else
+			result = duracheck
 		end
 		if(not result) then break end
 	end
@@ -262,6 +299,10 @@ function CraftingTool.Skill:Use() -- Uses a skill
 		self.WaitTime = 2000
 	else
 		self.WaitTime = 3000
+	end
+	
+	if(self.id == 276 or self.id == 100009)	then
+		CraftingTool.IQStacks = 0
 	end
 	
 	ActionList:Cast(self.id,0)
@@ -331,6 +372,18 @@ CraftingTool.KeyPressLog = {
 	Key_S = false,
 	Key_G = false }
 
+CraftingTool.foodTable = {
+eat = false,
+itemid = 0,
+lastticks = 0,
+ticks = 0 }
+
+CraftingTool.repairTable = {
+repair = false,
+condition = 0,
+lastticks = 0,
+ticks = 0 }
+	
 --[[ Profile Class ]]--
 CraftingTool.Profile = {
 	Name = "",
@@ -374,7 +427,7 @@ function CraftingTool.Profile:Read(filename)
 							skill = CraftingTool.Skill:New(skilldetails)
 						end
 						--d(skill)
-					elseif(skill and key=="name" or key=="on" or key=="prio") then
+					elseif(skill and key=="name" or key=="on" or key=="prio" or key=="duracheck") then
 						skill[key] = value
 					elseif(skill and key == "end") then
 						self.Skills:Add(skill)
@@ -420,7 +473,7 @@ function CraftingTool.Profile:Read(filename)
 			
 			--GUI call and sort
 			if ( TableSize(self.Skills) > 0 ) then
-				table.sort(self.Skills, function(a,b) return a.prio < b.prio end )	
+				self.Skills:sort()
 				self:Update()
 			end
 			d("Crafting Tool Profile Successfully Opened")
@@ -451,16 +504,17 @@ function CraftingTool.Profile:Write(filename)
 			
 			writeStr = writeStr.."CT_ON="..skill.on.."\n"
 			writeStr = writeStr.."CT_PRIO="..skill.prio.."\n"
+			writeStr = writeStr.."CT_DURACHECK="..Limit(skill.duracheck, 0, 1).."\n"
 			writeStr = writeStr.."CT_IQSTACKS="..skill:FindCondition( "iqstacks", ">=").."\n"
 			
 			writeStr = writeStr.."CT_CPMIN="..skill:FindCondition( "cp", "<=").."\n"
 			writeStr = writeStr.."CT_CPMAX="..skill:FindCondition( "cp", ">=").."\n"
 			writeStr = writeStr.."CT_STEPMIN="..skill:FindCondition( "step", "<=").."\n"
 			writeStr = writeStr.."CT_STEPMAX="..skill:FindCondition( "step", ">=").."\n"
-			writeStr = writeStr.."CT_PROGRESSMIN="..skill:FindCondition( "progress", "<=").."\n"
-			writeStr = writeStr.."CT_PROGRESSMAX="..skill:FindCondition( "progress", ">=").."\n"
-			writeStr = writeStr.."CT_QUALITYMIN="..skill:FindCondition( "quality", "<=").."\n"
-			writeStr = writeStr.."CT_QUALITYMAX="..skill:FindCondition( "quality", ">=").."\n"
+			writeStr = writeStr.."CT_PROGRESSMIN="..Limit(skill:FindCondition( "progress", "<="),0,100).."\n"
+			writeStr = writeStr.."CT_PROGRESSMAX="..Limit(skill:FindCondition( "progress", ">="),0,100).."\n"
+			writeStr = writeStr.."CT_QUALITYMIN="..Limit(skill:FindCondition( "quality", "<="),0,100).."\n"
+			writeStr = writeStr.."CT_QUALITYMAX="..Limit(skill:FindCondition( "quality", ">="),0,100).."\n"
 			writeStr = writeStr.."CT_DURABILITYMIN="..skill:FindCondition( "durability", "<=").."\n"
 			writeStr = writeStr.."CT_DURABILITYMAX="..skill:FindCondition( "durability", ">=").."\n"
 			
@@ -525,8 +579,22 @@ end
 function CraftingTool.Update(Event, ticks)  -- MAIN LOOP
 	if( gSMactive == "1" ) then
 		CraftingTool.currentSynth = Crafting:SynthInfo()
+		gMWcdelay = Limit(tonumber(gMWcdelay), 1000, 5000)
 		CraftingTool.customDelay = tonumber(gMWcdelay)
 		gMWcraftsleft = CraftingTool.craftsLeft
+		
+		--Check Food
+		CraftingTool.foodTable.eat = (gMWeatfood == "1")
+		CraftingTool.foodTable.itemid = tonumber(gMWfoodid)
+		CraftingTool.foodTable.ticks = ticks
+		FeedMe(CraftingTool.foodTable, tonumber(CraftingTool.customDelay), false)
+		gFMfoodcount = CraftingTool.foodTable.count
+		--Check Repair
+		CraftingTool.repairTable.repair = (gMWdorepair == "1")
+		CraftingTool.repairTable.condition = tonumber(gMWrepaircondition)
+		CraftingTool.repairTable.ticks = ticks
+		RepairMe(CraftingTool.repairTable, tonumber(CraftingTool.customDelay), false)
+		
 		
 		LogKeyPress()
 		if(CraftingTool.KeyPressLog.Ctrl and CraftingTool.KeyPressLog.Shift) then -- Left Ctrl + Shift 
@@ -549,7 +617,7 @@ function CraftingTool.Update(Event, ticks)  -- MAIN LOOP
 					gMWitemid = CraftingTool.currentSynth.itemid
 					
 					if(CraftingTool.lastQuality ~= CraftingTool.currentSynth.quality and PlayerHasBuff(CraftingTool.IQBuffID)) then CraftingTool.IQStacks = CraftingTool.IQStacks + 1 end
-									
+					
 					local skill_list = CraftingTool.Profile.Skills
 					local casted = false
 					
@@ -578,6 +646,7 @@ function CraftingTool.Update(Event, ticks)  -- MAIN LOOP
 				if (not Crafting:IsCraftingLogOpen()) then
 					Crafting:ToggleCraftingLog()
 				else
+					--Continue Crafting
 					gMWcrafting = "false"
 					gMWitemid = 0
 					gMWiqstacks = 0
@@ -644,33 +713,36 @@ end
 --Initialises CraftingTool Window
 function MainWindow()
 	--debug window
-	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Add Cond", "gDBcadd", "Debug")
-	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Edit Cond", "gDBcedit", "Debug")
-	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Evaluate Cond", "gDBcresults", "Debug")
-	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Log Key Press", "gDBlogkeys", "Debug")
+	local tabName = "Debug"
+	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Add Cond", "gDBcadd", tabName)
+	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Edit Cond", "gDBcedit", tabName)
+	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Evaluate Cond", "gDBcresults", tabName)
+	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Log Key Press", "gDBlogkeys", tabName)
 	gDBcadd = "0"
 	gDBcedit = "0"
 	gDBcresults = "0"
 	gDBlogkeys = "0"
 	
 	--Info Window 
-	GUI_NewField(CraftingTool.mainwindow.name,"Crafting","gMWcrafting", "Info")
-	GUI_NewNumeric(CraftingTool.mainwindow.name,"Crafts Left","gMWcraftsleft", "Info")
-	GUI_NewField(CraftingTool.mainwindow.name,"","gMWempty", "Info")
-	GUI_NewNumeric(CraftingTool.mainwindow.name,"Item ID","gMWitemid", "Info")
-	GUI_NewNumeric(CraftingTool.mainwindow.name,"IQ Stacks","gMWiqstacks", "Info")
-	GUI_NewField(CraftingTool.mainwindow.name,"Last Skill","gMWlastskill", "Info")
-	GUI_NewField(CraftingTool.mainwindow.name,"","gMWempty", "Info")
-	GUI_NewField(CraftingTool.mainwindow.name,"NQ Crafted","gMWnq", "Info")
-	GUI_NewField(CraftingTool.mainwindow.name,"HQ Crafted","gMWqh", "Info")
+	tabName = "Info"
+	GUI_NewField(CraftingTool.mainwindow.name,"Crafting","gMWcrafting", tabName)
+	GUI_NewNumeric(CraftingTool.mainwindow.name,"Crafts Left","gMWcraftsleft", tabName)
+	GUI_NewField(CraftingTool.mainwindow.name,"","gMWempty", tabName)
+	GUI_NewNumeric(CraftingTool.mainwindow.name,"Item ID","gMWitemid", tabName)
+	GUI_NewNumeric(CraftingTool.mainwindow.name,"IQ Stacks","gMWiqstacks", tabName)
+	GUI_NewField(CraftingTool.mainwindow.name,"Last Skill","gMWlastskill", tabName)
+	GUI_NewField(CraftingTool.mainwindow.name,"","gMWempty", tabName)
+	GUI_NewField(CraftingTool.mainwindow.name,"NQ Crafted","gMWnq", tabName)
+	GUI_NewField(CraftingTool.mainwindow.name,"HQ Crafted","gMWqh", tabName)
 	gMWnq = "Unavailable"
 	gMWqh = "Unavailable"
 	gMWcraftsleft = 0
 	--
 	
 	--Settings gMWcdelay
-	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Skill Manager", "gSMactive", "Settings")
-	GUI_NewNumeric(CraftingTool.mainwindow.name, "Custom Delay", "gMWcdelay", "Settings")
+	tabName = "Settings"
+	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Skill Manager", "gSMactive", tabName)
+	GUI_NewNumeric(CraftingTool.mainwindow.name, "Delay(Min:1000,Max:5000)", "gMWcdelay", tabName)
 		
 	if (Settings.CraftingTool.gSMactive == nil) then
 		Settings.CraftingTool.gSMactive = "1"
@@ -700,20 +772,37 @@ function MainWindow()
 	end
 	gMWRecipeLevel = Settings.CraftingTool.gMWRecipeLevel
 	]]--
-	
-	GUI_UnFoldGroup(CraftingTool.mainwindow.name,"Settings")
+	GUI_UnFoldGroup(CraftingTool.mainwindow.name,tabName)
 	--
 	
 	--Craft Window
-	GUI_NewNumeric(CraftingTool.mainwindow.name, "Craft Amount", "gMWCraftFor", "Craft")
-	GUI_NewComboBox(CraftingTool.mainwindow.name,"How To Craft","gMWHowToCraft", "Craft", "Until Stopped,Single,Limited")
+	tabName = "Craft"
+	GUI_NewNumeric(CraftingTool.mainwindow.name, "Craft Amount", "gMWCraftFor", tabName)
+	GUI_NewComboBox(CraftingTool.mainwindow.name,"How To Craft","gMWHowToCraft", tabName, "Until Stopped,Single,Limited")
 	gMWHowToCraft = "Until Stopped"
-	GUI_NewButton(CraftingTool.mainwindow.name, "Start", "StartCraft","Craft") 
-	GUI_NewButton(CraftingTool.mainwindow.name, "Stop", "StopCraft","Craft") 
-	--
-	
-	--Buttons at the bottom
+	GUI_NewButton(CraftingTool.mainwindow.name, "Start", "StartCraft",tabName) 
+	GUI_NewButton(CraftingTool.mainwindow.name, "Stop", "StopCraft",tabName) 
 	GUI_NewButton(CraftingTool.mainwindow.name, "Skill Manager", "OpenSkillMngr") 
+	GUI_UnFoldGroup(CraftingTool.mainwindow.name,tabName)
+	--
+	--Food Window
+	tabName = "Food"
+	GUI_NewNumeric(CraftingTool.mainwindow.name, "Food ID", "gMWfoodid", tabName)
+	GUI_NewNumeric(CraftingTool.mainwindow.name, "Food Count", "gFMfoodcount", tabName)
+	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Eat Food", "gMWeatfood", tabName)
+	if (Settings.CraftingTool.gMWfoodid == nil) then Settings.CraftingTool.gMWfoodid = "0" end
+	gMWfoodid = Settings.CraftingTool.gMWfoodid
+	if (Settings.CraftingTool.gMWeatfood == nil) then Settings.CraftingTool.gMWeatfood = "0" end
+	gMWeatfood = Settings.CraftingTool.gMWeatfood
+	--
+	--Repair Window
+	tabName = "Repair"
+	GUI_NewNumeric(CraftingTool.mainwindow.name, "Condition", "gMWrepaircondition", tabName)
+	GUI_NewCheckbox(CraftingTool.mainwindow.name, "Do Repair", "gMWdorepair", tabName)
+	if (Settings.CraftingTool.gMWrepaircondition == nil) then Settings.CraftingTool.gMWrepaircondition = "0" end
+	gMWrepaircondition = Settings.CraftingTool.gMWrepaircondition
+	if (Settings.CraftingTool.gMWdorepair == nil) then Settings.CraftingTool.gMWdorepair = "0" end
+	gMWdorepair = Settings.CraftingTool.gMWdorepair
 	--
 	
 	RegisterEventHandler("StartCraft", CraftingTool.Craft)
@@ -774,20 +863,20 @@ function SkillView()
 	--List of Keys: name, on, prio, cp, step, progress, quality, durability, description, buffid .. Min,Max 
 	GUI_NewField(CraftingTool.sview.name, "Id", "gSVid", "Skill")
 	GUI_NewField(CraftingTool.sview.name, "Name", "gSVname", "Skill")
-	GUI_NewField(CraftingTool.sview.name, "", "empty", "Skill")
-	GUI_NewCheckbox(CraftingTool.sview.name, "On", "gSVon", "Skill")
-	GUI_NewNumeric(CraftingTool.sview.name, "Priority", "gSVprio", "Skill")
-	GUI_NewNumeric(CraftingTool.sview.name,"IQStacks >=","gSViqstacks", "Skill")
 	local s = "------------------------------------------------------------------------------------------------------"
+	GUI_NewField(CraftingTool.sview.name, s, "emptyS", "Skill")
+	GUI_NewCheckbox(CraftingTool.sview.name, "On", "gSVon", "Skill")
+	GUI_NewNumeric(CraftingTool.sview.name,"IQStacks >=","gSViqstacks", "Skill")
+	GUI_NewCheckbox(CraftingTool.sview.name, "MaxDurab > 40", "gSVduracheck", "Skill")
 	GUI_NewField(CraftingTool.sview.name, s, "emptyS", "Skill")
 	GUI_NewNumeric(CraftingTool.sview.name,"CP >=","gSVcpMin", "Skill")
 	GUI_NewNumeric(CraftingTool.sview.name,"CP <=","gSVcpMax", "Skill")--
 	GUI_NewNumeric(CraftingTool.sview.name,"STEP >=","gSVstepMin", "Skill")
 	GUI_NewNumeric(CraftingTool.sview.name,"STEP <=","gSVstepMax", "Skill")--
-	GUI_NewNumeric(CraftingTool.sview.name,"PROGRESS >=","gSVprogressMin", "Skill")
-	GUI_NewNumeric(CraftingTool.sview.name,"PROGRESS <=","gSVprogressMax", "Skill")--
-	GUI_NewNumeric(CraftingTool.sview.name,"QUALITY >=","gSVqualityMin", "Skill")
-	GUI_NewNumeric(CraftingTool.sview.name,"QUALITY <=","gSVqualityMax", "Skill")--
+	GUI_NewNumeric(CraftingTool.sview.name,"PROGRESS% >=","gSVprogressMin", "Skill")
+	GUI_NewNumeric(CraftingTool.sview.name,"PROGRESS% <=","gSVprogressMax", "Skill")--
+	GUI_NewNumeric(CraftingTool.sview.name,"QUALITY% >=","gSVqualityMin", "Skill")
+	GUI_NewNumeric(CraftingTool.sview.name,"QUALITY% <=","gSVqualityMax", "Skill")--
 	GUI_NewNumeric(CraftingTool.sview.name,"DURABILITY >=","gSVdurabilityMin", "Skill")
 	GUI_NewNumeric(CraftingTool.sview.name,"DURABILITY <=","gSVdurabilityMax", "Skill")--
 	GUI_NewField(CraftingTool.sview.name, s, "emptyS", "Skill")
@@ -801,10 +890,10 @@ function SkillView()
 	GUI_UnFoldGroup(CraftingTool.sview.name,"Skill") -- Skill
 	
 	GUI_NewButton(CraftingTool.sview.name, "DELETE", "DELETE")
-	--GUI_NewButton(CraftingTool.sview.name, "Priority DOWN", "DOWN")
-	--GUI_NewButton(CraftingTool.sview.name, "Priority UP", "UP")
-	--RegisterEventHandler("UP", CraftingTool.SkillViewHandler)
-	--RegisterEventHandler("DOWN", CraftingTool.SkillViewHandler)
+	GUI_NewButton(CraftingTool.sview.name, "DOWN", "DOWN")
+	GUI_NewButton(CraftingTool.sview.name, "UP", "UP")
+	RegisterEventHandler("UP", CraftingTool.SkillViewHandler)
+	RegisterEventHandler("DOWN", CraftingTool.SkillViewHandler)
 	RegisterEventHandler("DELETE", CraftingTool.SkillViewHandler)
 end
 
@@ -911,8 +1000,8 @@ function updateSkillFromView( varname, value ) -- Updates the skill inside the P
 			key = key:gsub('min', ''):gsub('max', '')
 		end
 		if(key == "iqstacks") then ctype = ">=" end
-				
-		if(key == "id" or key=="name" or key=="on" or key=="prio") then
+		
+		if(key == "id" or key=="name" or key=="on" or key=="prio" or key=="duracheck") then
 			skill[key] = value
 			if(not CraftingTool.openingSkill) then CraftingTool.Profile:Update() end
 		elseif(key:match("description")) then
@@ -928,7 +1017,7 @@ function CraftingTool.UpdateView ( skill, opening )
 		local id 			= skill.id
 		local name 			= skill.name
 		local on 			= skill.on or 1
-		local prio 			= skill.prio or 1
+		local duracheck		= skill.duracheck or 0
 		local iqstacks		= skill:FindCondition( "iqstacks", ">=" ) or 0
 		local cpMin		 	= skill:FindCondition( "cp", "<=" ) or 0
 		local cpMax		 	= skill:FindCondition( "cp", ">=" ) or 0
@@ -948,7 +1037,7 @@ function CraftingTool.UpdateView ( skill, opening )
 		gSVid 			 = id
 		gSVname 		 = name
 		gSVon			 = on
-		gSVprio			 = prio
+		gSVduracheck	 = duracheck
 		gSViqstacks		 = iqstacks
 		gSVcpMin		 = cpMin
 		gSVcpMax		 = cpMax
@@ -1022,12 +1111,18 @@ function CraftingTool.SkillManagerHandler( dir )
 end
 
 function CraftingTool.SkillViewHandler( dir )
-	if(dir == "DELETE") then
-		if ( TableSize(CraftingTool.Profile.Skills) > 0 ) then
-			local uid = tonumber(CraftingTool.CurrentlyOpenUID)
+	if ( TableSize(CraftingTool.Profile.Skills) > 0 ) then	
+		local uid = tonumber(CraftingTool.CurrentlyOpenUID)
+		if(dir == "DELETE") then
 			CraftingTool.Profile.Skills:Remove(CraftingTool.Profile.Skills:getSkillByUID(uid))
 			CraftingTool.Profile:Update()
 			GUI_WindowVisible(CraftingTool.sview.name,false)
+		elseif(dir == "UP") then
+			CraftingTool.Profile.Skills:ChangePrio( uid , -1 )
+			CraftingTool.Profile:Update()
+		elseif(dir == "DOWN") then
+			CraftingTool.Profile.Skills:ChangePrio( uid , 1 )
+			CraftingTool.Profile:Update()
 		end
 	end
 end
@@ -1084,6 +1179,13 @@ function LogKeyPress( somevar )
 		if(CraftingTool.KeyPressLog.Key_S) then d("Key_S: " .. tostring(CraftingTool.KeyPressLog.Key_S)) end 
 		if(CraftingTool.KeyPressLog.Key_G) then d("Key_G: " .. tostring(CraftingTool.KeyPressLog.Key_G)) end
 	end
+end
+
+function Limit( value, minValue, maxValue )
+	value = value or 0
+	minValue = minValue or 0
+	maxValue = maxValue or 1
+	return math.max(minValue, math.min(value, maxValue))
 end
 
 -- formula based on http://www.bluegartr.com/threads/117684-The-crafting-thread.?p=5890541&viewfull=1#post5890541
